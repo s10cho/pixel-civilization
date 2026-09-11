@@ -45,7 +45,8 @@ export class CitizenView {
 
   constructor(
     private readonly scene: THREE.Scene,
-    private readonly capacity: number = CITIZENS.maxSimulated,
+    /** Citizens drawn at most (buffers always fit every simulated citizen). */
+    private limit: number = CITIZENS.maxSimulated,
   ) {
     const { body, shirt } = getCitizenGeometries();
     this.body = this.createMesh(body, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true }));
@@ -55,6 +56,10 @@ export class CitizenView {
       new THREE.MeshBasicMaterial({ color: 0xffffff }),
     );
     this.moods.castShadow = false;
+  }
+
+  setLimit(limit: number): void {
+    this.limit = Math.min(limit, CITIZENS.maxSimulated);
   }
 
   /** Citizens dress for the era. */
@@ -108,7 +113,7 @@ export class CitizenView {
     let drawn = 0;
     let marked = 0;
     for (const track of this.tracks.values()) {
-      if (!track.visible || drawn >= this.capacity) continue;
+      if (!track.visible || drawn >= this.limit) continue;
       const dx = track.toX - track.fromX;
       const dz = track.toZ - track.fromZ;
       const moving = Math.hypot(dx, dz) > 1e-4;
@@ -151,7 +156,7 @@ export class CitizenView {
   }
 
   private createMesh(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.InstancedMesh {
-    const mesh = new THREE.InstancedMesh(geometry, material, this.capacity);
+    const mesh = new THREE.InstancedMesh(geometry, material, CITIZENS.maxSimulated);
     mesh.count = 0;
     mesh.castShadow = true;
     // Citizens roam the whole map; skip culling against a single model's bounds.

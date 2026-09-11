@@ -3,7 +3,7 @@ import { BUILDABLE_TYPES, buildingName, getBuildCost, getUnlockState } from '../
 import type { Building, BuildingType } from '../building/types';
 import { getOccupancy } from '../citizen/occupancy';
 import { BUILDINGS, ERA_SETTINGS, OFFLINE } from '../config/balance';
-import { CAMERA, ERA_TRANSITION, SAVE, SIMULATION } from '../config/gameConfig';
+import { AUTO_QUALITY, CAMERA, ERA_TRANSITION, QUALITY, SAVE, SIMULATION, type QualityLevel } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
 import { detectProblems, type CityProblem, type ProblemKind } from '../economy/problems';
@@ -17,7 +17,7 @@ import { CitizenView } from '../render3d/CitizenView';
 import type { TileCoord } from '../render3d/coords';
 import { DecorView } from '../render3d/DecorView';
 import { GroundView } from '../render3d/GroundView';
-import { getQualityPreset } from '../render3d/quality';
+import { FrameRateMonitor, lowerQuality, resolveQualityLevel } from '../render3d/quality';
 import { SmokeView } from '../render3d/SmokeView';
 import { Stage } from '../render3d/Stage';
 import { TileMarkers } from '../render3d/TileMarkers';
@@ -45,7 +45,12 @@ import {
   problemText,
   RESEARCH_ERROR_MESSAGES,
 } from '../ui/messages';
+import { Modal } from '../ui/Modal';
 import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
+import { openSettings } from '../ui/SettingsDialog';
+import type { TutorialView } from '../ui/TutorialCard';
+import { loadPreferences, savePreferences, type Preferences } from '../storage/preferences';
+import { Tutorial, TUTORIAL_STEPS, type TutorialEvent } from '../tutorial/tutorial';
 import { getBuildingAt } from '../world/placement';
 import { getExpansionCost, getUnlockedArea } from '../world/territory';
 import type { Screen } from './Screen';
@@ -144,6 +149,15 @@ export class CityScreen implements Screen {
   private autosaveTimer: number | undefined;
   /** Epoch ms when the tab was hidden, to credit the gap when it returns. */
   private hiddenAt: number | null = null;
+  /** The simulation stands still while the pause menu is open. */
+  private paused = false;
+  private pauseModal: Modal | null = null;
+  private settingsModal: Modal | null = null;
+  private qualityLevel: QualityLevel = 'high';
+  private autoQuality = false;
+  private readonly frameRate = new FrameRateMonitor();
+  /** First-time guidance for a new city, while it runs. */
+  private tutorial: Tutorial | null = null;
 
   constructor(
     private readonly viewRoot: HTMLElement,
@@ -153,10 +167,14 @@ export class CityScreen implements Screen {
   ) {
     this.state = options.save?.state ?? createInitialState();
     this.displayEra = this.state.era;
+    if (!options.save && !loadPreferences().tutorialDone) this.tutorial = new Tutorial();
   }
 
   mount(): void {
-    const quality = getQualityPreset();
+    const { level, auto } = resolveQualityLevel();
+    this.qualityLevel = level;
+    this.autoQuality = auto;
+    const quality = QUALITY[level];
     this.stage = new Stage(this.viewRoot, quality);
     this.ground = new GroundView(this.stage.scene);
     this.buildings = new BuildingView(this.stage.scene);
@@ -184,7 +202,9 @@ export class CityScreen implements Screen {
       onStartResearch: (id) => this.beginResearch(id),
       onAdvanceEra: () => this.advance(),
       onShowEra: () => this.showTownHall(),
-      onOpenMenu: () => this.exitToMenu(),
+      onOpenMenu: () => this.openPause(),
+      onTutorialNext: () => this.advanceTutorial(),
+      onTutorialSkip: () => this.finishTutorial(),
     });
     this.seenLevel = this.state.cityLevel;
     this.seenResearchCount = this.state.research.completed.length;
@@ -218,6 +238,8 @@ export class CityScreen implements Screen {
     this.stage.renderer.setAnimationLoop(null);
     this.clearLongPress();
     window.clearInterval(this.autosaveTimer);
+    this.settingsModal?.close();
+    this.pauseModal?.close();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('resize', this.onResize);
@@ -235,9 +257,10 @@ export class CityScreen implements Screen {
   }
   private readonly frame = (now: number): void => {
     // rAF timestamps can precede the performance.now() taken at mount, so never step backwards.
-    const dt = Math.min(Math.max(0, (now - this.lastFrame) / 1000), SIMULATION.maxCatchUpSeconds);
+    const frameSeconds = Math.max(0, (now - this.lastFrame) / 1000);
     this.lastFrame = now;
-    this.accumulator += dt;
+    if (!this.paused) this.accumulator += Math.min(frameSeconds, SIMULATION.maxCatchUpSeconds);
+    if (this.autoQuality) this.adaptQuality(frameSeconds);
     let ticked = false;
     while (this.accumulator >= SIMULATION.tickSeconds) {
       this.report = tickSimulation(this.state, SIMULATION.tickSeconds);
@@ -464,6 +487,7 @@ export class CityScreen implements Screen {
         this.onCityChanged();
         this.popBuilding(getBuildingAt(this.state, tile.col, tile.row)?.id);
         audio.play('place');
+        this.notifyTutorial({ kind: 'placed', type: this.activeTool });
       } else this.fail(ACTION_ERROR_MESSAGES[result.error]);
       this.hoverTile = tile;
       this.updatePreview();
@@ -478,7 +502,12 @@ export class CityScreen implements Screen {
     this.selectedTile = tile;
     this.markers.setSelection(tile);
     // One card at a time: a selected building replaces the research panel.
-    if (tile && getBuildingAt(this.state, tile.col, tile.row)) this.researchOpen = false;
+    const building = tile ? getBuildingAt(this.state, tile.col, tile.row) : undefined;
+    if (building) {
+      this.researchOpen = false;
+      audio.play('select');
+      this.notifyTutorial({ kind: 'selected', type: building.type });
+    }
     this.refreshUI();
   }
 
@@ -722,6 +751,7 @@ export class CityScreen implements Screen {
     this.selectedTile = null;
     this.markers.setSelection(null);
     this.newUnlocks.delete(type);
+    if (this.activeTool === type) this.notifyTutorial({ kind: 'toolSelected', type });
     this.updatePreview();
     this.refreshUI();
   }
@@ -777,6 +807,91 @@ export class CityScreen implements Screen {
     this.markers.setSelection(null);
     this.updatePreview();
     this.refreshUI();
+  }
+
+  // --- Pause, settings, quality, tutorial --------------------------------------------------
+
+  private openPause(): void {
+    if (this.pauseModal?.isOpen) return;
+    this.paused = true;
+    this.cancelTool();
+    this.cancelMove();
+    this.pauseModal = new Modal(this.uiRoot, {
+      title: 'Paused',
+      icon: 'pause',
+      body: 'Your city waits while this menu is open. It is saved automatically.',
+      actions: [
+        { label: 'Settings', icon: 'settings', keepOpen: true, onClick: () => this.openSettingsDialog() },
+        { label: 'Save & exit', icon: 'arrowLeft', variant: 'warning', onClick: () => this.exitToMenu() },
+        { label: 'Resume', icon: 'play', variant: 'primary' },
+      ],
+      onClose: () => {
+        this.paused = false;
+        this.pauseModal = null;
+      },
+    });
+  }
+
+  private openSettingsDialog(): void {
+    if (this.settingsModal?.isOpen) return;
+    this.settingsModal = openSettings(this.uiRoot, {
+      onQualityChange: (quality) => this.setQualityPreference(quality),
+      onClose: () => {
+        this.settingsModal = null;
+      },
+    });
+  }
+
+  private setQualityPreference(quality: Preferences['quality']): void {
+    this.autoQuality = quality === 'auto';
+    if (quality !== 'auto') this.applyQuality(quality);
+  }
+
+  private applyQuality(level: QualityLevel): void {
+    this.qualityLevel = level;
+    const preset = QUALITY[level];
+    this.stage.setQuality(preset);
+    this.citizens.setLimit(preset.renderedCitizens);
+    this.smoke.setPuffs(preset.smokePuffs);
+    this.syncBuildings();
+  }
+
+  /** "Auto" quality: step down while the frame rate stays below the target. */
+  private adaptQuality(frameSeconds: number): void {
+    const fps = this.frameRate.sample(frameSeconds);
+    if (fps === null || fps >= AUTO_QUALITY.downgradeBelowFps) return;
+    const lower = lowerQuality(this.qualityLevel);
+    if (lower) this.applyQuality(lower);
+  }
+
+  private notifyTutorial(event: TutorialEvent): void {
+    if (!this.tutorial?.notify(event)) return;
+    audio.play('select');
+    this.refreshUI();
+  }
+
+  private advanceTutorial(): void {
+    this.tutorial?.next();
+    if (this.tutorial?.finished) this.finishTutorial();
+    else this.refreshUI();
+  }
+
+  private finishTutorial(): void {
+    this.tutorial = null;
+    savePreferences({ tutorialDone: true });
+    this.refreshUI();
+  }
+
+  private tutorialView(): TutorialView | null {
+    const step = this.tutorial?.step;
+    if (!this.tutorial || !step) return null;
+    return {
+      step: this.tutorial.stepNumber,
+      total: TUTORIAL_STEPS.length,
+      title: step.title,
+      text: step.text,
+      canContinue: !step.completes,
+    };
   }
 
   // --- View --------------------------------------------------------------------------------
@@ -880,6 +995,7 @@ export class CityScreen implements Screen {
       eraReady: eraProgress?.ready ? ERA_SETTINGS[eraProgress.next].name : null,
       expansionCost: getExpansionCost(this.state.expansionLevel),
       hint: this.hintText(),
+      tutorial: this.tutorialView(),
     });
   }
 }

@@ -62,7 +62,9 @@ export class CameraRig {
     const size = bounds.getSize(corner);
     const viewWidth = this.camera.right - this.camera.left;
     const viewHeight = this.camera.top - this.camera.bottom;
-    const zoom = Math.min((viewWidth * CAMERA.fitRatio) / size.x, (viewHeight * CAMERA.fitRatio) / size.y);
+    // In portrait the narrow width limits the fit, so use more of it.
+    const ratio = viewWidth < viewHeight ? CAMERA.fitRatioPortrait : CAMERA.fitRatio;
+    const zoom = Math.min((viewWidth * ratio) / size.x, (viewHeight * ratio) / size.y);
     this.camera.zoom = THREE.MathUtils.clamp(zoom, CAMERA.minZoom, CAMERA.maxZoom);
     this.camera.updateProjectionMatrix();
     this.controls.update();

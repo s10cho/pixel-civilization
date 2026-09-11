@@ -1026,9 +1026,14 @@ body {
 
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 18px;
+}
+
+.modal-actions .btn {
+  white-space: nowrap;
 }
 
 .offline-stats {
@@ -1060,6 +1065,116 @@ body {
   font-weight: 800;
 }
 
+/* --- Settings & credits ---------------------------------------------------------------- */
+
+.settings {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-label {
+  font-weight: 650;
+}
+
+.settings-range {
+  width: 100%;
+  accent-color: var(--ui-accent);
+}
+
+.settings-value {
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-muted);
+}
+
+.settings-select {
+  grid-column: 2 / 4;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--ui-text);
+  background: var(--ui-card-solid);
+  border: 1px solid rgba(31, 42, 58, 0.16);
+  border-radius: 10px;
+}
+
+.credits-heading {
+  margin: 14px 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.credits-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.credits-list li {
+  margin: 4px 0;
+}
+
+.credits-list a {
+  color: var(--ui-accent);
+}
+
+/* --- Tutorial -------------------------------------------------------------------------- */
+
+#ui .tutorial-card {
+  align-self: center;
+  box-sizing: border-box;
+  width: min(440px, 100%);
+  padding: 12px 14px 10px;
+  border-left: 4px solid var(--ui-accent);
+}
+
+.tutorial-step {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-accent);
+}
+
+.tutorial-title {
+  margin: 2px 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.tutorial-text {
+  font-size: 13px;
+  color: var(--ui-muted);
+}
+
+.tutorial-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.btn.btn-link {
+  height: auto;
+  padding: 4px 2px;
+  font-size: 13px;
+  color: var(--ui-muted);
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn.btn-link:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: none;
+}
+
 /* --- Mobile ---------------------------------------------------------------------------- */
 
 @media (max-width: 600px) {
@@ -1086,6 +1201,11 @@ body {
 
   .top-right .btn-label {
     display: none;
+  }
+
+  /* Dialog buttons share each row evenly instead of leaving ragged gaps. */
+  .modal-actions .btn {
+    flex: 1 1 auto;
   }
 
   .hud {

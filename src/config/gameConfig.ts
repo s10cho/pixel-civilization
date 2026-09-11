@@ -34,6 +34,8 @@ export const CAMERA = {
   maxZoom: 4,
   /** Share of the viewport the territory fills when the camera auto-focuses on it. */
   fitRatio: 0.8,
+  /** Tighter fit in portrait, where the narrow width limits how much of the city shows. */
+  fitRatioPortrait: 0.95,
   /** Height (world units) assumed for buildings when fitting the camera to an area. */
   fitHeight: 1.2,
   /** Pointer travel (screen px) before a press counts as a camera drag rather than a tap. */
@@ -183,6 +185,17 @@ export const QUALITY: Record<QualityLevel, QualityPreset> = {
   medium: { antialias: true, maxPixelRatio: 1.5, shadowMapSize: 1024, renderedCitizens: 35, smokePuffs: 4 },
   low: { antialias: false, maxPixelRatio: 1, shadowMapSize: 0, renderedCitizens: 20, smokePuffs: 2 },
 };
+
+/** Adaptive quality ("Auto"): step down a preset when the frame rate stays low. */
+export const AUTO_QUALITY = {
+  /** Average the frame rate over windows of this length. */
+  sampleSeconds: 4,
+  downgradeBelowFps: 40,
+  /** Longer gaps (a hidden tab, a hitch) are not frames worth measuring. */
+  maxFrameGapSeconds: 0.25,
+  /** Windows ignored at the start, while shaders compile. */
+  warmupSamples: 1,
+} as const;
 
 /** Selection frame and placement preview drawn on tiles. */
 export const MARKERS = {

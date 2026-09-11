@@ -18,6 +18,7 @@ import { Modal } from './Modal';
 import { ProblemsBar } from './ProblemsBar';
 import { ResearchPanel, type ResearchPanelView } from './ResearchPanel';
 import { Toast } from './Toast';
+import { TutorialCard, type TutorialView } from './TutorialCard';
 
 export interface CityUIHandlers {
   onSelectTool(type: BuildingType): void;
@@ -32,6 +33,8 @@ export interface CityUIHandlers {
   /** Show the Town Hall, where the era can be advanced. */
   onShowEra(): void;
   onOpenMenu(): void;
+  onTutorialNext(): void;
+  onTutorialSkip(): void;
 }
 
 /** Presentation state the scene pushes into the UI. */
@@ -57,6 +60,8 @@ export interface CityUIView {
   expansionCost: number | null;
   /** Short instruction shown above the build dock, or null. */
   hint: string | null;
+  /** The current tutorial tip, or null when there is no tutorial. */
+  tutorial: TutorialView | null;
 }
 
 /** DOM overlay for the city scene. Owns no game state; renders the view it is given. */
@@ -74,6 +79,7 @@ export class CityUI {
   private readonly expandLabel: HTMLElement;
   private readonly expandCost = el('span', 'btn-cost');
   private readonly buildingPanel: BuildingPanel;
+  private readonly tutorialCard: TutorialCard;
   private readonly hint = el('div', 'hint');
   private readonly toast = new Toast();
   private readonly eraBannerTitle = el('div', 'era-banner-title');
@@ -132,7 +138,8 @@ export class CityUI {
     // The building panel lives in the bottom bar so that on mobile it stacks above the build
     // bar however many rows that wraps to; on desktop CSS docks it to the right side instead.
     const bottomBar = el('div', 'bottom-bar');
-    bottomBar.append(this.buildingPanel.element, this.hint, this.buildBar.element);
+    this.tutorialCard = new TutorialCard(handlers.onTutorialNext, handlers.onTutorialSkip);
+    bottomBar.append(this.buildingPanel.element, this.tutorialCard.element, this.hint, this.buildBar.element);
 
     this.container.append(topBar, this.toast.element, bottomBar, this.eraOverlay);
     root.append(this.container);
@@ -174,6 +181,7 @@ export class CityUI {
 
     this.hint.hidden = view.hint === null;
     if (view.hint) setText(this.hint, view.hint);
+    this.tutorialCard.update(view.tutorial);
   }
 
   showMessage(text: string): void {

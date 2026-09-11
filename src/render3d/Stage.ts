@@ -13,7 +13,7 @@ export class Stage {
 
   constructor(
     private readonly container: HTMLElement,
-    private readonly quality: QualityPreset,
+    private quality: QualityPreset,
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: quality.antialias });
     this.renderer.shadowMap.enabled = quality.shadowMapSize > 0;
@@ -38,6 +38,31 @@ export class Stage {
     this.hemisphere.intensity = look.hemiIntensity;
     this.sun.color.setHex(look.sunColor);
     this.sun.intensity = look.sunIntensity;
+  }
+
+  /**
+   * Switches quality live: pixel ratio and shadows. (Anti-aliasing is fixed when the renderer
+   * is created.)
+   */
+  setQuality(preset: QualityPreset): void {
+    this.quality = preset;
+    const shadows = preset.shadowMapSize > 0;
+    if (shadows !== this.renderer.shadowMap.enabled) {
+      this.renderer.shadowMap.enabled = shadows;
+      this.sun.castShadow = shadows;
+      // Materials compile shadow support into their shaders, so they must rebuild.
+      this.scene.traverse((object) => {
+        const material = (object as THREE.Mesh).material;
+        if (!material) return;
+        for (const m of Array.isArray(material) ? material : [material]) m.needsUpdate = true;
+      });
+    }
+    if (shadows && this.sun.shadow.mapSize.x !== preset.shadowMapSize) {
+      this.sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
+    this.resize();
   }
 
   /** Matches the canvas to its container; the camera keeps CAMERA.pixelsPerTile at zoom 1. */

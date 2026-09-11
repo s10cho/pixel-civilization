@@ -27,8 +27,13 @@ export class SmokeView {
 
   constructor(
     private readonly scene: THREE.Scene,
-    private readonly puffsPerEmitter: number,
+    private puffsPerEmitter: number,
   ) {}
+
+  /** Puffs per chimney; takes effect on the next sync. */
+  setPuffs(puffs: number): void {
+    this.puffsPerEmitter = puffs;
+  }
 
   sync(buildings: readonly Building[], eraOf: EraOf): void {
     this.emitters = [];
