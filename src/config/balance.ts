@@ -240,3 +240,17 @@ export const TERRITORY = {
   /** Each expansion costs this many times the previous one. */
   expansionCostGrowth: 2.5,
 } as const;
+
+/**
+ * Progress while the game is closed or the tab is hidden (design brief: capped, resources
+ * only — no research, XP or events).
+ */
+export const OFFLINE = {
+  maxSeconds: 8 * 60 * 60,
+  /** Shorter gaps are simply simulated as normal ticks, without a report. */
+  minReportSeconds: 60,
+  /** Offline production is integrated in steps of this length. */
+  stepSeconds: 60,
+  /** Share of normal production earned while away. */
+  efficiency: 1,
+} as const;

@@ -2,6 +2,7 @@ import { audio } from './audio/AudioEngine';
 import { CityScreen } from './screens/CityScreen';
 import { MenuScreen } from './screens/MenuScreen';
 import type { Screen } from './screens/Screen';
+import type { LoadedSave } from './storage/saveStore';
 import { getUiRoot } from './ui/dom';
 import './ui/ui.css';
 
@@ -19,11 +20,11 @@ function show(next: Screen): void {
 
 function showMenu(): void {
   audio.playMusic('ancient');
-  show(new MenuScreen(uiRoot, { onNewGame: showCity }));
+  show(new MenuScreen(uiRoot, { onStart: showCity }));
 }
 
-function showCity(): void {
-  show(new CityScreen(viewRoot!, uiRoot, { onExit: showMenu }));
+function showCity(slot: number, save: LoadedSave | null): void {
+  show(new CityScreen(viewRoot!, uiRoot, { onExit: showMenu }, { slot, save }));
 }
 
 // Browsers allow audio only after a user gesture; any press unlocks (or resumes) it.

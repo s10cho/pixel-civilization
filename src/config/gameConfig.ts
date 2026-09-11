@@ -127,6 +127,15 @@ export const ERA_TRANSITION = {
   bannerMs: 3600,
 } as const;
 
+/** Save games (IndexedDB). */
+export const SAVE = {
+  slots: 3,
+  autosaveSeconds: 30,
+  dbName: 'pixel-civilization',
+  dbVersion: 1,
+  storeName: 'saves',
+} as const;
+
 /** Generative WebAudio music and synthesized sound effects. */
 export const AUDIO = {
   defaultMusicVolume: 0.5,

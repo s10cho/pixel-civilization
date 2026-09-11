@@ -1,16 +1,20 @@
 import type { Building, BuildingType } from '../building/types';
 import type { Occupancy } from '../citizen/occupancy';
+import { OFFLINE } from '../config/balance';
 import { ERA_TRANSITION } from '../config/gameConfig';
 import type { ResearchId } from '../config/research';
 import type { BuildingReport } from '../economy/cityReport';
 import type { CityProblem, ProblemKind } from '../economy/problems';
 import type { EraId } from '../progression/era';
 import type { Resources } from '../simulation/gameState';
+import type { OfflineReport } from '../simulation/offline';
 import { BuildBar, type BuildOption } from './BuildBar';
 import { BuildingPanel, type CityInfo } from './BuildingPanel';
 import { button, el, setText } from './dom';
-import { formatAmount } from './format';
+import { formatAmount, formatDuration } from './format';
 import { Hud } from './Hud';
+import { icon } from './icons';
+import { Modal } from './Modal';
 import { ProblemsBar } from './ProblemsBar';
 import { ResearchPanel, type ResearchPanelView } from './ResearchPanel';
 import { Toast } from './Toast';
@@ -76,6 +80,7 @@ export class CityUI {
   private readonly eraBannerSubtitle = el('div', 'era-banner-subtitle');
   private readonly eraOverlay = this.createEraOverlay();
   private eraTimer: number | undefined;
+  private offlineModal: Modal | null = null;
 
   constructor(root: HTMLElement, handlers: CityUIHandlers) {
     this.problems = new ProblemsBar(handlers.onFocusProblem);
@@ -173,6 +178,32 @@ export class CityUI {
 
   showMessage(text: string): void {
     this.toast.show(text);
+  }
+
+  /** "Welcome back" summary of what the city produced while the player was away. */
+  showOfflineReport(report: OfflineReport): void {
+    this.offlineModal?.close();
+    const body = el('div', 'offline-report');
+    body.append(el('p', 'modal-text', `You were away for ${formatDuration(report.awaySeconds)}. Your city kept working:`));
+    const stats = el('div', 'offline-stats');
+    for (const [iconName, value, label] of [
+      ['coins', report.gold, 'gold'],
+      ['users', report.population, 'citizens'],
+    ] as const) {
+      const row = el('div', 'offline-stat');
+      row.append(icon(iconName), el('strong', 'offline-value', `+${formatAmount(value)}`), el('span', '', label));
+      stats.append(row);
+    }
+    body.append(stats);
+    if (report.capped) {
+      body.append(el('p', 'modal-note', `Time away counts for up to ${formatDuration(OFFLINE.maxSeconds)}.`));
+    }
+    this.offlineModal = new Modal(this.container, {
+      title: 'Welcome back!',
+      icon: 'clock',
+      body,
+      actions: [{ label: 'Collect', variant: 'primary' }],
+    });
   }
 
   /**

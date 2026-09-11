@@ -2,8 +2,8 @@ import { audio } from '../audio/AudioEngine';
 import { BUILDABLE_TYPES, buildingName, getBuildCost, getUnlockState } from '../building/rules';
 import type { Building, BuildingType } from '../building/types';
 import { getOccupancy } from '../citizen/occupancy';
-import { BUILDINGS, ERA_SETTINGS } from '../config/balance';
-import { CAMERA, ERA_TRANSITION, SIMULATION } from '../config/gameConfig';
+import { BUILDINGS, ERA_SETTINGS, OFFLINE } from '../config/balance';
+import { CAMERA, ERA_TRANSITION, SAVE, SIMULATION } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
 import { detectProblems, type CityProblem, type ProblemKind } from '../economy/problems';
@@ -31,7 +31,9 @@ import {
   validatePlacement,
 } from '../simulation/actions';
 import { createInitialState, type GameState } from '../simulation/gameState';
+import { applyOfflineProgress } from '../simulation/offline';
 import { tickSimulation } from '../simulation/tick';
+import { saveSlot, type LoadedSave } from '../storage/saveStore';
 import type { BuildOption } from '../ui/BuildBar';
 import type { CityInfo, EraInfo } from '../ui/BuildingPanel';
 import { CityUI } from '../ui/CityUI';
@@ -50,6 +52,13 @@ import type { Screen } from './Screen';
 
 export interface CityScreenHandlers {
   onExit(): void;
+}
+
+export interface CityScreenOptions {
+  /** Save slot this city lives in. */
+  slot: number;
+  /** A loaded save to resume, or null for a new city. */
+  save: LoadedSave | null;
 }
 
 interface Press {
@@ -88,7 +97,7 @@ const NEW_UNLOCK_HIGHLIGHT_MS = 10_000;
  * camera gesture handled by OrbitControls on the same canvas.
  */
 export class CityScreen implements Screen {
-  private readonly state: GameState = createInitialState();
+  private readonly state: GameState;
   private stage!: Stage;
   private rig!: CameraRig;
   private ground!: GroundView;
@@ -112,7 +121,7 @@ export class CityScreen implements Screen {
   /** Whether "ready for the next era" was already announced for the current era. */
   private announcedEraReady = false;
   /** The era the environment currently shows (lags state.era during a transition). */
-  private displayEra: EraId = this.state.era;
+  private displayEra: EraId;
   /** Buildings still showing an older era's model during a transition. */
   private readonly eraOverrides = new Map<number, EraId>();
   private transition: EraTransition | null = null;
@@ -129,12 +138,22 @@ export class CityScreen implements Screen {
   /** Unsimulated time carried over between frames, in seconds. */
   private accumulator = 0;
   private lastFrame = 0;
+  /** Saves run one after another so an older snapshot never overwrites a newer one. */
+  private saving: Promise<void> = Promise.resolve();
+  private saveErrorShown = false;
+  private autosaveTimer: number | undefined;
+  /** Epoch ms when the tab was hidden, to credit the gap when it returns. */
+  private hiddenAt: number | null = null;
 
   constructor(
     private readonly viewRoot: HTMLElement,
     private readonly uiRoot: HTMLElement,
     private readonly handlers: CityScreenHandlers,
-  ) {}
+    private readonly options: CityScreenOptions,
+  ) {
+    this.state = options.save?.state ?? createInitialState();
+    this.displayEra = this.state.era;
+  }
 
   mount(): void {
     const quality = getQualityPreset();
@@ -165,13 +184,22 @@ export class CityScreen implements Screen {
       onStartResearch: (id) => this.beginResearch(id),
       onAdvanceEra: () => this.advance(),
       onShowEra: () => this.showTownHall(),
-      onOpenMenu: () => this.handlers.onExit(),
+      onOpenMenu: () => this.exitToMenu(),
     });
     this.seenLevel = this.state.cityLevel;
     this.seenResearchCount = this.state.research.completed.length;
+    // A resumed city earns resources for the time it was closed.
+    const save = this.options.save;
+    const offline = save ? applyOfflineProgress(this.state, (Date.now() - save.savedAt) / 1000) : null;
     this.recomputeReport();
     this.updateProblems(false);
     this.refreshUI();
+    if (offline && offline.awaySeconds >= OFFLINE.minReportSeconds) this.ui.showOfflineReport(offline);
+    // Claim the slot right away and keep it current.
+    void this.save();
+    this.autosaveTimer = window.setInterval(() => void this.save(), SAVE.autosaveSeconds * 1000);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+    window.addEventListener('pagehide', this.onPageHide);
 
     const canvas = this.stage.canvas;
     canvas.addEventListener('pointerdown', this.onPointerDown);
@@ -189,6 +217,9 @@ export class CityScreen implements Screen {
   unmount(): void {
     this.stage.renderer.setAnimationLoop(null);
     this.clearLongPress();
+    window.clearInterval(this.autosaveTimer);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown);
     this.rig.dispose();
@@ -230,6 +261,62 @@ export class CityScreen implements Screen {
     this.rig.update();
     this.stage.render();
   };
+
+  // --- Saving and time away ----------------------------------------------------------------
+
+  /** Queues a save of the current state to this city's slot. */
+  private save(): Promise<void> {
+    this.saving = this.saving
+      .then(() => saveSlot(this.options.slot, this.state))
+      .catch(() => {
+        if (this.saveErrorShown) return;
+        this.saveErrorShown = true;
+        this.ui.showMessage('Could not save the game in this browser');
+      });
+    return this.saving;
+  }
+
+  private exitToMenu(): void {
+    void this.save().finally(() => this.handlers.onExit());
+  }
+
+  private readonly onVisibilityChange = (): void => {
+    if (document.hidden) {
+      this.hiddenAt = Date.now();
+      void this.save();
+      return;
+    }
+    if (this.hiddenAt !== null) {
+      const away = (Date.now() - this.hiddenAt) / 1000;
+      this.hiddenAt = null;
+      this.catchUp(away);
+    }
+  };
+
+  private readonly onPageHide = (): void => {
+    void this.save();
+  };
+
+  /**
+   * Credits time the page was hidden (animation frames stop then). Short gaps are simulated
+   * normally; longer ones count as time away: resources only, with a report.
+   */
+  private catchUp(seconds: number): void {
+    if (seconds >= OFFLINE.minReportSeconds) {
+      this.ui.showOfflineReport(applyOfflineProgress(this.state, seconds));
+    } else {
+      for (let t = 0; t + SIMULATION.tickSeconds <= seconds; t += SIMULATION.tickSeconds) {
+        this.report = tickSimulation(this.state, SIMULATION.tickSeconds);
+      }
+    }
+    this.accumulator = 0;
+    this.lastFrame = performance.now();
+    this.citizens.sync(this.state.citizens);
+    this.recomputeReport();
+    this.updateProblems(false);
+    this.announceProgress();
+    this.refreshUI();
+  }
 
   // --- Input -------------------------------------------------------------------------------
 
