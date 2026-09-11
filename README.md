@@ -27,10 +27,17 @@ src/
   research/        research tree
   economy/         resources and offline production
   rendering/       Phaser-side presentation helpers (placeholder textures for now)
-  ui/              UI widgets
+  ui/              DOM overlay UI (HUD, build bar, panels, main menu)
   persistence/     IndexedDB save slots, localStorage preferences
   audio/           BGM and sound effects
 ```
+
+## UI libraries
+
+The DOM UI uses [NES.css](https://github.com/nostalgic-css/NES.css) (MIT) for pixel-art
+components, the [Galmuri](https://github.com/quiple/galmuri) pixel font (SIL OFL 1.1, with Hangul)
+and [pixelarticons](https://github.com/halfmage/pixelarticons) (MIT). Their licenses ship with the
+build under `public/licenses/`.
 
 ## Deployment
 

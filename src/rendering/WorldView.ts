@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import type { BuildingType } from '../building/types';
-import { CAMERA, COLORS, DEPTH, TEXTURE_KEYS, UI, WORLD } from '../config/gameConfig';
+import { COLORS, DEPTH, LEVEL_PIPS, TEXTURE_KEYS, WORLD } from '../config/gameConfig';
 import type { GameState } from '../simulation/gameState';
 import { isUnlocked } from '../world/territory';
 
@@ -8,6 +8,7 @@ const BUILDING_TEXTURES: Record<BuildingType, string> = {
   townHall: TEXTURE_KEYS.townHall,
   house: TEXTURE_KEYS.house,
   shop: TEXTURE_KEYS.shop,
+  park: TEXTURE_KEYS.park,
 };
 
 export interface TileCoord {
@@ -19,7 +20,7 @@ export interface TileCoord {
 export class WorldView {
   private readonly tiles: Phaser.GameObjects.Image[] = [];
   private readonly buildingSprites = new Map<number, Phaser.GameObjects.Image>();
-  private readonly levelLabels = new Map<number, Phaser.GameObjects.Text>();
+  private readonly levelPips = new Map<number, Phaser.GameObjects.Graphics>();
   private readonly selectionFrame: Phaser.GameObjects.Rectangle;
   private readonly previewSprite: Phaser.GameObjects.Image;
   private readonly previewFrame: Phaser.GameObjects.Rectangle;
@@ -95,42 +96,40 @@ export class WorldView {
       }
       sprite.setPosition(x, y);
 
-      this.syncLevelLabel(building.id, building.level, x + size - 1, y + 1);
+      this.syncLevelPips(building.id, building.level, x, y);
     }
 
     for (const [id, sprite] of this.buildingSprites) {
       if (!alive.has(id)) {
         sprite.destroy();
         this.buildingSprites.delete(id);
-        this.levelLabels.get(id)?.destroy();
-        this.levelLabels.delete(id);
+        this.levelPips.get(id)?.destroy();
+        this.levelPips.delete(id);
       }
     }
   }
 
-  /** Small level badge in the tile's top-right corner, shown from level 2 upward. */
-  private syncLevelLabel(buildingId: number, level: number, x: number, y: number): void {
-    let label = this.levelLabels.get(buildingId);
+  /** One gold pixel pip per level along the tile's bottom-left edge, shown from level 2 upward. */
+  private syncLevelPips(buildingId: number, level: number, tileX: number, tileY: number): void {
+    let pips = this.levelPips.get(buildingId);
     if (level <= 1) {
-      label?.destroy();
-      this.levelLabels.delete(buildingId);
+      pips?.destroy();
+      this.levelPips.delete(buildingId);
       return;
     }
-    if (!label) {
-      label = this.scene.add
-        .text(0, 0, '', {
-          fontFamily: UI.fontFamily,
-          fontSize: '9px',
-          color: COLORS.textPrimary,
-          backgroundColor: COLORS.background,
-          padding: { x: 1, y: 0 },
-        })
-        .setOrigin(1, 0)
-        .setResolution(CAMERA.maxZoom)
-        .setDepth(DEPTH.buildingLabels);
-      this.levelLabels.set(buildingId, label);
+    if (!pips) {
+      pips = this.scene.add.graphics().setDepth(DEPTH.levelPips);
+      this.levelPips.set(buildingId, pips);
     }
-    label.setText(String(level)).setPosition(x, y);
+
+    const { size, gap, margin } = LEVEL_PIPS;
+    const y = tileY + WORLD.tileSize - margin - size;
+    pips.clear();
+    for (let i = 0; i < level; i++) {
+      const x = tileX + margin + i * (size + gap);
+      pips.fillStyle(COLORS.levelPipOutline).fillRect(x, y, size, size);
+      pips.fillStyle(COLORS.levelPip).fillRect(x + 1, y + 1, size - 2, size - 2);
+    }
   }
 
   setSelection(tile: TileCoord | null): void {

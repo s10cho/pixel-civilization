@@ -9,6 +9,8 @@ export const BUILDABLE_TYPES: readonly BuildingType[] = (Object.keys(BUILDINGS) 
 export interface BuildingOutput {
   goldPerSecond: number;
   populationCapacity: number;
+  jobs: number;
+  happinessBonus: number;
 }
 
 export function getLevelMultiplier(level: number): number {
@@ -21,6 +23,8 @@ export function getBuildingOutput(building: Building): BuildingOutput {
   return {
     goldPerSecond: definition.goldPerSecond * multiplier,
     populationCapacity: Math.floor(definition.populationCapacity * multiplier),
+    jobs: Math.floor(definition.jobs * multiplier),
+    happinessBonus: definition.happinessBonus * multiplier,
   };
 }
 

@@ -1,0 +1,379 @@
+/*
+ * Game UI on top of NES.css (pixel-art components) with the Galmuri pixel font and
+ * pixelarticons icons. Loaded after NES.css so these rules win.
+ */
+
+:root {
+  --ui-font: Galmuri11, ui-monospace, Menlo, Consolas, monospace;
+  --ui-ground: #1b1f2a;
+  --ui-panel: #212529;
+  --ui-panel-soft: rgba(33, 37, 41, 0.92);
+  --ui-frame: #f4ecd0;
+  --ui-text: #f4ecd0;
+  --ui-muted: #a3a7b3;
+  --ui-gold: #f7d51d;
+  --ui-pop: #6ec6ff;
+  --ui-power: #ffb03b;
+  --ui-happy: #92cc41;
+  --ui-neutral: #f7d51d;
+  --ui-unhappy: #e76e55;
+  --ui-error: #e76e55;
+  --ui-gap: 8px;
+}
+
+/* NES.css ships a reboot with a white page; keep the game's dark ground while loading. */
+html,
+body {
+  background: var(--ui-ground);
+}
+
+/* The overlay never blocks the canvas except where an element opts in (buttons, panels). */
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  color: var(--ui-text);
+  font: 12px/1.5 var(--ui-font);
+  -webkit-font-smoothing: none;
+}
+
+#ui [hidden] {
+  display: none !important;
+}
+
+#ui button,
+#ui .panel {
+  pointer-events: auto;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- Icons ----------------------------------------------------------------------------- */
+
+/* pixelarticons use a 24-unit grid of 2-unit pixels, so 12px and 24px render crisply. */
+.icon {
+  display: inline-flex;
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
+.icon svg {
+  width: 100%;
+  height: 100%;
+  shape-rendering: crispEdges;
+}
+
+/* --- Buttons --------------------------------------------------------------------------- */
+
+#ui .nes-btn {
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+.btn-cost {
+  padding: 0 4px;
+  color: #6b4a00;
+  background: rgba(247, 213, 29, 0.35);
+}
+
+.btn-cost.is-unaffordable {
+  color: #fff;
+  background: var(--ui-error);
+}
+
+/* --- City layout ----------------------------------------------------------------------- */
+
+.city-ui {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.top-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-gap);
+}
+
+.menu-button {
+  margin-left: auto;
+}
+
+.bottom-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.build-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* --- HUD ------------------------------------------------------------------------------- */
+
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  /* Room for the pixel frame drawn with box-shadow outside each chip. */
+  padding: 3px;
+}
+
+.hud-resource {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 6px;
+  color: var(--ui-text);
+  background: var(--ui-panel-soft);
+  /* Pixel frame with notched corners, like NES.css's rounded containers. */
+  box-shadow:
+    0 -3px 0 0 var(--ui-frame),
+    0 3px 0 0 var(--ui-frame),
+    -3px 0 0 0 var(--ui-frame),
+    3px 0 0 0 var(--ui-frame);
+}
+
+.hud-resource[data-resource='gold'] .icon {
+  color: var(--ui-gold);
+}
+
+.hud-resource[data-resource='population'] .icon {
+  color: var(--ui-pop);
+}
+
+.hud-resource[data-resource='power'] .icon {
+  color: var(--ui-power);
+}
+
+.hud-resource[data-mood='happy'] .icon {
+  color: var(--ui-happy);
+}
+
+.hud-resource[data-mood='neutral'] .icon {
+  color: var(--ui-neutral);
+}
+
+.hud-resource[data-mood='unhappy'] .icon {
+  color: var(--ui-unhappy);
+}
+
+.hud-value {
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Building panel -------------------------------------------------------------------- */
+
+#ui .panel {
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* Desktop: panel docks to the right side under the HUD. `#ui` outranks NES.css's
+   `.nes-container { position: relative }`. */
+#ui .building-panel {
+  position: absolute;
+  top: 84px;
+  right: max(12px, env(safe-area-inset-right));
+  width: 272px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#ui .building-panel.nes-container {
+  padding: 18px 14px 14px;
+}
+
+#ui .building-panel > .title {
+  margin: -30px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.close-button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-height: 0;
+  padding: 0 2px;
+}
+
+.close-button .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.panel-level {
+  color: var(--ui-muted);
+}
+
+.panel-text {
+  margin: 0;
+}
+
+.panel-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel-stats li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-stats .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.stat-gold .icon {
+  color: var(--ui-gold);
+}
+
+.stat-pop .icon {
+  color: var(--ui-pop);
+}
+
+.stat-jobs .icon {
+  color: var(--ui-power);
+}
+
+.stat-happy .icon {
+  color: var(--ui-happy);
+}
+
+.upgrade-button {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* --- Hint & toast ---------------------------------------------------------------------- */
+
+#ui .hint.nes-container,
+#ui .toast.nes-container {
+  margin: 0;
+  padding: 8px 14px;
+  text-align: center;
+}
+
+.toast {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 48px);
+}
+
+#ui .toast.nes-container {
+  color: var(--ui-error);
+}
+
+/* --- Main menu ------------------------------------------------------------------------- */
+
+.main-menu {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.main-menu-title {
+  margin: 0;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ui-text);
+  text-shadow: 4px 4px 0 #000;
+}
+
+.main-menu-subtitle {
+  margin: 0 0 20px;
+  color: var(--ui-muted);
+}
+
+.main-menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(240px, 100%);
+}
+
+.main-menu-buttons .nes-btn {
+  width: 100%;
+}
+
+/* --- Mobile ---------------------------------------------------------------------------- */
+
+@media (max-width: 600px) {
+  /* Panel joins the bottom bar's flow, directly above the (possibly wrapped) build bar.
+     Relative (not static) so the absolutely placed close button stays inside the panel. */
+  #ui .building-panel {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 100%;
+  }
+
+  .hud {
+    gap: 10px;
+  }
+
+  .hud-resource {
+    gap: 4px;
+    padding: 2px 6px 2px 4px;
+  }
+
+  .hud .icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .build-bar .icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .main-menu-title {
+    font-size: 24px;
+  }
+}

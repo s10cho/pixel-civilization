@@ -15,5 +15,6 @@ export const ACTION_ERROR_MESSAGES: Record<ActionError, string> = {
 export const BUILDING_DESCRIPTIONS: Record<BuildingType, string> = {
   townHall: 'City center. Collects taxes from every citizen.',
   house: 'Home for citizens.',
-  shop: 'Earns gold.',
+  shop: 'Earns gold and gives citizens jobs.',
+  park: 'Makes the whole city happier.',
 };

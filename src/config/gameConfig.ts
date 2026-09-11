@@ -15,6 +15,20 @@ export const TEXTURE_KEYS = {
   townHall: 'placeholder-town-hall',
   house: 'placeholder-house',
   shop: 'placeholder-shop',
+  park: 'placeholder-park',
+  citizen: 'placeholder-citizen',
+  moodHappy: 'placeholder-mood-happy',
+  moodUnhappy: 'placeholder-mood-unhappy',
+} as const;
+
+export const CITIZEN_VIEW = {
+  width: 6,
+  height: 10,
+  /** Feet are drawn this many pixels below the tile position so citizens stand on the ground. */
+  footOffsetPx: 8,
+  moodIconSize: 3,
+  /** Gap between the top of the head and the mood icon. */
+  moodGapPx: 2,
 } as const;
 
 /** World grid dimensions (in tiles) and tile size (in pixels). */
@@ -49,7 +63,8 @@ export const SIMULATION = {
 export const DEPTH = {
   tiles: 0,
   buildings: 10,
-  buildingLabels: 15,
+  citizens: 12,
+  levelPips: 15,
   selection: 20,
   preview: 30,
 } as const;
@@ -66,24 +81,29 @@ export const COLORS = {
   houseRoof: 0x4a78b5,
   shopWall: 0xe0b85a,
   shopAwning: 0xb5484a,
+  citizenSkin: 0xf2c9a0,
+  citizenShirt: 0x3a6fb0,
+  citizenLegs: 0x3b3340,
+  parkGrass: 0x7fb24a,
+  parkTreeLeaves: 0x2f6b2f,
+  parkTreeTrunk: 0x6b4a2a,
+  parkFlower: 0xf2d35b,
+  moodHappy: 0x6fd36f,
+  moodUnhappy: 0xe0524a,
   previewValid: 0x7cff7c,
   previewInvalid: 0xff5a5a,
   selection: 0xffe27a,
-  buttonFill: 0x2e3648,
-  buttonFillHover: 0x3d4760,
-  buttonFillDisabled: 0x23293a,
-  buttonStroke: 0xe8d8a8,
-  textPrimary: '#f4ecd0',
-  textMuted: '#8a8fa0',
+  levelPip: 0xf7d51d,
+  levelPipOutline: 0x1b1f2a,
+} as const;
+
+/** Building level indicator: a row of small square pips (world pixels). */
+export const LEVEL_PIPS = {
+  size: 4,
+  gap: 1,
+  margin: 2,
 } as const;
 
 export const UI = {
-  fontFamily: 'monospace',
-  titleFontSize: 40,
-  bodyFontSize: 16,
-  buttonWidth: 200,
-  buttonHeight: 44,
-  buttonGap: 14,
-  hudMargin: 12,
   toastDurationMs: 1800,
 } as const;

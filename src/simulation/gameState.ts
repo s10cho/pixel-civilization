@@ -1,5 +1,6 @@
 import type { Building } from '../building/types';
-import { ECONOMY } from '../config/balance';
+import type { Citizen } from '../citizen/types';
+import { ECONOMY, HAPPINESS } from '../config/balance';
 import { WORLD } from '../config/gameConfig';
 
 export interface Resources {
@@ -14,22 +15,29 @@ export interface Resources {
 export interface GameState {
   resources: Resources;
   buildings: Building[];
+  citizens: Citizen[];
   /** Number of territory expansions purchased. */
   expansionLevel: number;
   nextBuildingId: number;
+  nextCitizenId: number;
+  /** PRNG state for simulation randomness (see simulation/random.ts). */
+  rngState: number;
 }
 
-export function createInitialState(): GameState {
+export function createInitialState(seed: number = Date.now()): GameState {
   const state: GameState = {
     resources: {
       gold: ECONOMY.startingGold,
       population: 0,
       power: ECONOMY.startingPower,
-      happiness: ECONOMY.startingHappiness,
+      happiness: HAPPINESS.base,
     },
     buildings: [],
+    citizens: [],
     expansionLevel: 0,
     nextBuildingId: 1,
+    nextCitizenId: 1,
+    rngState: seed | 0,
   };
 
   state.buildings.push({

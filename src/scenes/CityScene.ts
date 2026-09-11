@@ -1,7 +1,9 @@
 import * as Phaser from 'phaser';
 import type { BuildingType } from '../building/types';
 import { CAMERA, SCENE_KEYS, SIMULATION, WORLD } from '../config/gameConfig';
+import { getOccupancy } from '../citizen/occupancy';
 import { CameraController } from '../rendering/CameraController';
+import { CitizenView } from '../rendering/CitizenView';
 import { WorldView, type TileCoord } from '../rendering/WorldView';
 import {
   expandTerritory,
@@ -24,6 +26,7 @@ import { getExpansionCost, getUnlockedArea, isInsideWorld } from '../world/terri
 export class CityScene extends Phaser.Scene {
   private state!: GameState;
   private worldView!: WorldView;
+  private citizenView!: CitizenView;
   private cameraController!: CameraController;
   private ui!: CityUI;
 
@@ -55,6 +58,8 @@ export class CityScene extends Phaser.Scene {
     this.worldView = new WorldView(this);
     this.worldView.syncTerritory(this.state);
     this.worldView.syncBuildings(this.state);
+    this.citizenView = new CitizenView(this);
+    this.citizenView.sync(this.state.citizens);
 
     this.cameraController = new CameraController(
       this.cameras.main,
@@ -105,7 +110,11 @@ export class CityScene extends Phaser.Scene {
       this.tickAccumulator -= SIMULATION.tickSeconds;
       ticked = true;
     }
-    if (ticked) this.refreshUI();
+    if (ticked) {
+      this.citizenView.sync(this.state.citizens);
+      this.refreshUI();
+    }
+    this.citizenView.render(this.tickAccumulator / SIMULATION.tickSeconds);
   }
 
   private focusTerritory(): void {
@@ -266,6 +275,7 @@ export class CityScene extends Phaser.Scene {
       resources: this.state.resources,
       activeTool: this.activeTool,
       selectedBuilding,
+      selectedOccupancy: selectedBuilding ? getOccupancy(this.state, selectedBuilding) : null,
       expansionCost: getExpansionCost(this.state.expansionLevel),
     });
   }

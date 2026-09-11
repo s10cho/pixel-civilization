@@ -1,49 +1,36 @@
 import * as Phaser from 'phaser';
-import { COLORS, SCENE_KEYS, UI } from '../config/gameConfig';
-import { TextButton } from '../ui/TextButton';
+import { SCENE_KEYS, TEXTURE_KEYS } from '../config/gameConfig';
+import { getUiRoot } from '../ui/dom';
+import { MainMenuUI } from '../ui/MainMenuUI';
 
-/** Main menu. Only "New Game" is wired up in Milestone 0; the rest are placeholders. */
+/** Title screen: a dimmed ground pattern behind the DOM menu. */
 export class MenuScene extends Phaser.Scene {
-  private content!: Phaser.GameObjects.Container;
+  private background!: Phaser.GameObjects.TileSprite;
+  private ui!: MainMenuUI;
 
   constructor() {
     super(SCENE_KEYS.menu);
   }
 
   create(): void {
-    const title = this.add
-      .text(0, -150, 'Pixel Civilization', {
-        fontFamily: UI.fontFamily,
-        fontSize: `${UI.titleFontSize}px`,
-        color: COLORS.textPrimary,
-      })
-      .setOrigin(0.5);
+    const { width, height } = this.scale.gameSize;
+    this.background = this.add
+      .tileSprite(0, 0, width, height, TEXTURE_KEYS.tileGround)
+      .setOrigin(0)
+      .setAlpha(0.18);
 
-    const step = UI.buttonHeight + UI.buttonGap;
-    const buttons = [
-      new TextButton(this, 0, -40, { label: 'Continue', enabled: false }),
-      new TextButton(this, 0, -40 + step, {
-        label: 'New Game',
-        onClick: () => this.scene.start(SCENE_KEYS.city),
-      }),
-      new TextButton(this, 0, -40 + step * 2, { label: 'Settings', enabled: false }),
-      new TextButton(this, 0, -40 + step * 3, { label: 'Credits', enabled: false }),
-    ];
+    this.ui = new MainMenuUI(getUiRoot(), {
+      onNewGame: () => this.scene.start(SCENE_KEYS.city),
+    });
 
-    this.content = this.add.container(0, 0, [title, ...buttons]);
-
-    this.layout(this.scale.gameSize);
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.layout, this);
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.scale.off(Phaser.Scale.Events.RESIZE, this.layout, this);
+      this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);
+      this.ui.destroy();
     });
   }
 
-  private layout(gameSize: Phaser.Structs.Size): void {
-    // Shrink the menu on narrow (portrait mobile) screens so the title never overflows.
-    const naturalWidth = this.content.getBounds().width / this.content.scaleX;
-    const scale = Math.min(1, (gameSize.width - UI.hudMargin * 2) / naturalWidth);
-    this.content.setScale(scale);
-    this.content.setPosition(Math.round(gameSize.width / 2), Math.round(gameSize.height / 2));
+  private onResize(gameSize: Phaser.Structs.Size): void {
+    this.background.setSize(gameSize.width, gameSize.height);
   }
 }

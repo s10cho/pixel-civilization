@@ -8,12 +8,42 @@ export const ECONOMY = {
   startingGold: 50,
   /** Power has no mechanics until Milestone 3; shown in the HUD only. */
   startingPower: 0,
-  /** Happiness has no mechanics until Milestone 2/3; shown in the HUD only. */
-  startingHappiness: 50,
   /** Gold per second the Town Hall collects for each whole citizen. */
   taxPerCitizenPerSecond: 0.1,
-  /** Citizens gained per second while population is below housing capacity. */
+  /** Citizens gained per second while population is below housing capacity (at neutral mood). */
   populationGrowthPerSecond: 0.5,
+} as const;
+
+export const HAPPINESS = {
+  /** Mood of a housed, employed citizen in a city with no happiness buildings. */
+  base: 50,
+  unemployedPenalty: 20,
+  /** Temporary bonus after a leisure visit, fading at leisureBoostDecayPerSecond. */
+  leisureBoost: 10,
+  leisureBoostDecayPerSecond: 0.2,
+  /** Cap on the summed city-wide bonus from buildings such as parks. */
+  maxBuildingBonus: 30,
+  /** How fast a citizen's mood moves towards its target, in points per second. */
+  adjustPerSecond: 5,
+  unhappyBelow: 35,
+  happyFrom: 70,
+  /** Walk speed multiplier at 0 and at 100 happiness. */
+  speedMultiplier: [0.6, 1.4],
+  /** Population growth multiplier = happiness / base, clamped to this range. */
+  growthMultiplier: [0.5, 1.5],
+} as const;
+
+export const CITIZENS = {
+  /** Simulated citizen entities; population beyond this is represented proportionally. */
+  maxSimulated: 50,
+  walkSpeedTilesPerSecond: 1.5,
+  homeRestSeconds: [4, 10],
+  workSeconds: [8, 16],
+  leisureSeconds: [5, 10],
+  /** Chance that free time (after work, or while unemployed) is spent at a leisure spot. */
+  leisureChance: 0.6,
+  /** Max distance from a leisure tile's centre where visitors stand, in tiles. */
+  leisureSpreadTiles: 0.3,
 } as const;
 
 export const LEVELING = {
@@ -32,6 +62,9 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     maxLevel: 1,
     goldPerSecond: 0,
     populationCapacity: 0,
+    jobs: 0,
+    happinessBonus: 0,
+    leisureSpot: false,
   },
   house: {
     name: 'House',
@@ -41,6 +74,9 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     maxLevel: 5,
     goldPerSecond: 0,
     populationCapacity: 5,
+    jobs: 0,
+    happinessBonus: 0,
+    leisureSpot: false,
   },
   shop: {
     name: 'Shop',
@@ -50,6 +86,21 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     maxLevel: 5,
     goldPerSecond: 1,
     populationCapacity: 0,
+    jobs: 4,
+    happinessBonus: 0,
+    leisureSpot: false,
+  },
+  park: {
+    name: 'Park',
+    buildable: true,
+    buildCost: 30,
+    upgradeBaseCost: 50,
+    maxLevel: 3,
+    goldPerSecond: 0,
+    populationCapacity: 0,
+    jobs: 0,
+    happinessBonus: 6,
+    leisureSpot: true,
   },
 };
 
