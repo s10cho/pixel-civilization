@@ -31,6 +31,14 @@ export const PALETTE = {
   skin: 0xf2c9a0,
   pants: 0x3b3340,
   white: 0xffffff,
+  millWall: 0xd8cfc0,
+  sail: 0xf4efe6,
+  brick: 0xb5523b,
+  brickDark: 0x7a3526,
+  roofDark: 0x4a4f5a,
+  stone: 0xbfb8aa,
+  gold: 0xf2c14e,
+  shrineInner: 0x6b5b95,
 } as const;
 
 type ColorKey = keyof typeof PALETTE;
@@ -69,8 +77,10 @@ const pyramid = (radius: number, height: number) =>
   new THREE.ConeGeometry(radius, height, 4).rotateY(Math.PI / 4);
 
 function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const merged = mergeGeometries(parts);
-  for (const p of parts) p.dispose();
+  // Boxes and cylinders are indexed but polyhedra are not; mergeGeometries needs one kind.
+  const uniform = parts.map((p) => (p.index ? p.toNonIndexed() : p));
+  const merged = mergeGeometries(uniform);
+  for (const p of [...parts, ...uniform]) p.dispose();
   if (!merged) throw new Error('Failed to merge model parts');
   return merged;
 }
@@ -120,6 +130,54 @@ function buildingParts(type: BuildingType, level: number): THREE.BufferGeometry[
         part(box(0.14, 0.08, 0.01), 'flag', { x: 0.33, y: 1.34, z: 0.26 }),
         part(box(0.16, 0.22, 0.02), 'door', { y: 0.11, z: 0.425 }),
       ];
+    case 'powerPlant': {
+      // Windmill tower; its sails are a separate rotor so they can turn (see getRotor).
+      const tower = windmillTowerHeight(level);
+      return [
+        part(new THREE.CylinderGeometry(0.18, 0.26, tower, 8), 'millWall', { y: tower / 2 }),
+        part(new THREE.ConeGeometry(0.24, 0.24, 8), 'hallRoof', { y: tower + 0.12 }),
+        part(box(0.12, 0.2, 0.02), 'door', { y: 0.1, z: 0.25 }),
+        part(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6), 'trunk', {
+          y: tower - 0.04,
+          z: 0.24,
+          rotX: Math.PI / 2,
+        }),
+      ];
+    }
+    case 'researchCenter': {
+      // Shrine: an open colonnade around a glowing core, crowned by a gold orb.
+      const height = 0.36 + 0.06 * (level - 1);
+      const columns = [
+        [-0.24, -0.24],
+        [0.24, -0.24],
+        [-0.24, 0.24],
+        [0.24, 0.24],
+      ].map(([x, z]) =>
+        part(new THREE.CylinderGeometry(0.045, 0.05, height, 8), 'hallWall', { x, y: 0.08 + height / 2, z }),
+      );
+      return [
+        part(box(0.74, 0.08, 0.74), 'stone', { y: 0.04 }),
+        ...columns,
+        part(box(0.3, height * 0.7, 0.3), 'shrineInner', { y: 0.08 + height * 0.35 }),
+        part(pyramid(0.52, 0.26), 'houseRoof', { y: 0.08 + height + 0.13 }),
+        part(new THREE.OctahedronGeometry(0.06), 'gold', { y: 0.08 + height + 0.32 }),
+      ];
+    }
+    case 'factory': {
+      return [
+        part(box(0.8, 0.4, 0.64), 'brick', { y: 0.2 }),
+        // Sawtooth roof: two triangular prisms along the depth.
+        part(new THREE.CylinderGeometry(0.14, 0.14, 0.64, 3), 'roofDark', { x: -0.18, y: 0.44, rotX: Math.PI / 2 }),
+        part(new THREE.CylinderGeometry(0.14, 0.14, 0.64, 3), 'roofDark', { x: 0.14, y: 0.44, rotX: Math.PI / 2 }),
+        part(new THREE.CylinderGeometry(0.06, 0.08, 0.55 + 0.08 * (level - 1), 8), 'brickDark', {
+          x: 0.3,
+          y: 0.62 + 0.04 * (level - 1),
+          z: -0.2,
+        }),
+        part(box(0.2, 0.24, 0.02), 'roofDark', { x: -0.15, y: 0.12, z: 0.325 }),
+        part(box(0.14, 0.1, 0.02), 'window', { x: 0.2, y: 0.26, z: 0.325 }),
+      ];
+    }
     case 'park': {
       const trees: [number, number, number][] = [
         [-0.22, -0.2, 1],
@@ -137,6 +195,49 @@ function buildingParts(type: BuildingType, level: number): THREE.BufferGeometry[
       ];
     }
   }
+}
+
+function windmillTowerHeight(level: number): number {
+  return 0.62 + 0.06 * (level - 1);
+}
+
+/** A moving part drawn separately from its building (e.g. windmill sails). */
+export interface Rotor {
+  /** Cache key shared by every rotor with this geometry. */
+  key: string;
+  geometry: THREE.BufferGeometry;
+  /** Pivot position relative to the building's origin. */
+  pivot: THREE.Vector3;
+  /** Rotation speed in radians per second, around the local z axis. */
+  speed: number;
+}
+
+let sailsGeometry: THREE.BufferGeometry | null = null;
+
+/** Four sails around a hub at the origin, in the x-y plane (facing +z). */
+function getSailsGeometry(): THREE.BufferGeometry {
+  if (!sailsGeometry) {
+    const blades: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 4; i++) {
+      blades.push(part(box(0.035, 0.42, 0.012), 'trunk', { y: 0.23 }).rotateZ((i * Math.PI) / 2));
+      blades.push(part(box(0.1, 0.3, 0.008), 'sail', { x: 0.06, y: 0.26 }).rotateZ((i * Math.PI) / 2));
+    }
+    sailsGeometry = merge(blades);
+  }
+  return sailsGeometry;
+}
+
+/** The animated part of a building, if it has one. */
+export function getRotor(type: BuildingType, level: number): Rotor | null {
+  if (type === 'powerPlant') {
+    return {
+      key: 'sails',
+      geometry: getSailsGeometry(),
+      pivot: new THREE.Vector3(0, windmillTowerHeight(level) - 0.04, 0.31),
+      speed: 1.6,
+    };
+  }
+  return null;
 }
 
 export interface CitizenGeometries {

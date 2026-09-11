@@ -1,6 +1,13 @@
-import type { BuildingType } from '../building/types';
+import { BUILDABLE_TYPES, buildingName, getBuildCost, getUnlockState } from '../building/rules';
+import type { Building, BuildingType } from '../building/types';
 import { getOccupancy } from '../citizen/occupancy';
+import { BUILDINGS, ERA_SETTINGS } from '../config/balance';
 import { CAMERA, SIMULATION } from '../config/gameConfig';
+import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
+import { computeCityReport, type CityReport } from '../economy/cityReport';
+import { detectProblems, type CityProblem, type ProblemKind } from '../economy/problems';
+import { isMaxLevel, unlocksAtLevel, xpToNextLevel } from '../progression/level';
+import { getResearchStatus, hasResearchBuilding, startResearch } from '../progression/research';
 import { BuildingView } from '../render3d/BuildingView';
 import { CameraRig } from '../render3d/CameraRig';
 import { CitizenView } from '../render3d/CitizenView';
@@ -12,14 +19,19 @@ import { TileMarkers } from '../render3d/TileMarkers';
 import { TilePicker } from '../render3d/TilePicker';
 import {
   expandTerritory,
+  moveBuilding,
   placeBuilding,
   upgradeBuilding,
+  validateMove,
   validatePlacement,
 } from '../simulation/actions';
 import { createInitialState, type GameState } from '../simulation/gameState';
 import { tickSimulation } from '../simulation/tick';
+import type { BuildOption } from '../ui/BuildBar';
+import type { CityInfo } from '../ui/BuildingPanel';
 import { CityUI } from '../ui/CityUI';
-import { ACTION_ERROR_MESSAGES } from '../ui/messages';
+import { ACTION_ERROR_MESSAGES, problemText, RESEARCH_ERROR_MESSAGES } from '../ui/messages';
+import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
 import { getBuildingAt } from '../world/placement';
 import { getExpansionCost, getUnlockedArea } from '../world/territory';
 import type { Screen } from './Screen';
@@ -31,13 +43,26 @@ export interface CityScreenHandlers {
 interface Press {
   x: number;
   y: number;
-  /** Set once the press turns into a camera drag or a multi-touch gesture. */
+  pointerType: string;
+  /** Movable building under the pointer when the press started, if any. */
+  buildingId: number | null;
+  /** Set once the press turns into a camera gesture; it is then neither a tap nor a move. */
   cancelled: boolean;
+  /** True while this press is dragging a building to a new tile. */
+  dragging: boolean;
+  longPressTimer: number | undefined;
 }
 
+/** How long newly unlocked build tools pulse, in ms. */
+const NEW_UNLOCK_HIGHLIGHT_MS = 10_000;
+
 /**
- * The city: owns the game state for the session, runs the fixed-step simulation, turns taps into
- * player actions, and keeps the 3D view and DOM UI in sync with the state.
+ * The city: owns the game state for the session, runs the fixed-step simulation, turns pointer
+ * input into player actions, and keeps the 3D view and DOM UI in sync with the state.
+ *
+ * Input: a tap selects, places (with a build tool) or moves (in move mode). Dragging a building
+ * with the mouse, or long-pressing it on touch, picks it up to move it; any other drag is a
+ * camera gesture handled by OrbitControls on the same canvas.
  */
 export class CityScreen implements Screen {
   private readonly state: GameState = createInitialState();
@@ -50,9 +75,21 @@ export class CityScreen implements Screen {
   private picker!: TilePicker;
   private ui!: CityUI;
 
+  /** Derived view of the city from the latest tick (or player action). */
+  private report!: CityReport;
+  private problems: CityProblem[] = [];
+  private announcedProblems = new Set<ProblemKind>();
+  /** Progress already announced, to spot level-ups and finished research. */
+  private seenLevel = 1;
+  private seenResearchCount = 0;
+  private newUnlocks = new Set<BuildingType>();
+  private newUnlocksUntil = 0;
+
   private activeTool: BuildingType | null = null;
+  private movingBuildingId: number | null = null;
   private selectedTile: TileCoord | null = null;
-  /** Tile under the mouse, for the placement preview (desktop only). */
+  private researchOpen = false;
+  /** Tile under the pointer, for the placement / move preview. */
   private hoverTile: TileCoord | null = null;
   private press: Press | null = null;
   private readonly activePointers = new Set<number>();
@@ -84,10 +121,18 @@ export class CityScreen implements Screen {
     this.ui = new CityUI(this.uiRoot, {
       onSelectTool: (type) => this.selectTool(type),
       onUpgrade: (buildingId) => this.upgrade(buildingId),
+      onMoveBuilding: (buildingId) => this.toggleMove(buildingId),
       onCloseBuildingPanel: () => this.clearSelection(),
       onExpand: () => this.expand(),
+      onFocusProblem: (kind) => this.focusProblem(kind),
+      onToggleResearch: () => this.toggleResearch(),
+      onStartResearch: (id) => this.beginResearch(id),
       onOpenMenu: () => this.handlers.onExit(),
     });
+    this.seenLevel = this.state.cityLevel;
+    this.seenResearchCount = this.state.research.completed.length;
+    this.recomputeReport();
+    this.updateProblems(false);
     this.refreshUI();
 
     const canvas = this.stage.canvas;
@@ -105,6 +150,7 @@ export class CityScreen implements Screen {
 
   unmount(): void {
     this.stage.renderer.setAnimationLoop(null);
+    this.clearLongPress();
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown);
     this.rig.dispose();
@@ -124,39 +170,83 @@ export class CityScreen implements Screen {
     this.accumulator += dt;
     let ticked = false;
     while (this.accumulator >= SIMULATION.tickSeconds) {
-      tickSimulation(this.state, SIMULATION.tickSeconds);
+      this.report = tickSimulation(this.state, SIMULATION.tickSeconds);
       this.accumulator -= SIMULATION.tickSeconds;
       ticked = true;
     }
     if (ticked) {
       this.citizens.sync(this.state.citizens);
+      this.updateProblems(true);
+      this.announceProgress();
       // Gold changes over time, so a preview can flip between valid and invalid.
       this.updatePreview();
       this.refreshUI();
     }
 
-    this.citizens.render(this.accumulator / SIMULATION.tickSeconds, now / 1000);
+    const seconds = now / 1000;
+    this.citizens.render(this.accumulator / SIMULATION.tickSeconds, seconds);
+    this.buildings.animate(seconds);
     this.rig.update();
     this.stage.render();
   };
 
   // --- Input -------------------------------------------------------------------------------
-  // Camera gestures are handled by OrbitControls on the same canvas; here we only detect taps.
 
   private readonly onPointerDown = (event: PointerEvent): void => {
     this.activePointers.add(event.pointerId);
     if (this.activePointers.size > 1) {
-      // A second finger means pinch/twist, never a tap.
-      if (this.press) this.press.cancelled = true;
+      // A second finger means pinch/twist: never a tap, and it drops a building being dragged.
+      this.abortPress();
       return;
     }
-    this.press = event.button === 0 ? { x: event.clientX, y: event.clientY, cancelled: false } : null;
+    if (event.button !== 0) {
+      this.press = null;
+      return;
+    }
+
+    const building =
+      this.activeTool || this.movingBuildingId !== null
+        ? null
+        : this.picker.pickBuilding(event.clientX, event.clientY);
+    const movable = building !== null && BUILDINGS[building.type].movable;
+    this.press = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerType: event.pointerType,
+      buildingId: movable ? building.id : null,
+      cancelled: false,
+      dragging: false,
+      longPressTimer: undefined,
+    };
+    if (!movable) return;
+
+    if (event.pointerType === 'mouse') {
+      // A mouse drag that starts on a building moves the building instead of panning.
+      this.rig.controls.enabled = false;
+    } else {
+      this.press.longPressTimer = window.setTimeout(() => this.beginDrag(), CAMERA.longPressMs);
+    }
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
-    if (this.press) {
-      const travelled = Math.hypot(event.clientX - this.press.x, event.clientY - this.press.y);
-      if (travelled > CAMERA.dragThresholdPx) this.press.cancelled = true;
+    const press = this.press;
+    if (press) {
+      if (press.dragging) {
+        this.hoverTile = this.picker.pick(event.clientX, event.clientY);
+        this.updatePreview();
+        return;
+      }
+      const travelled = Math.hypot(event.clientX - press.x, event.clientY - press.y);
+      if (travelled <= CAMERA.dragThresholdPx || press.cancelled) return;
+      if (press.buildingId !== null && press.pointerType === 'mouse') {
+        this.beginDrag();
+        this.hoverTile = this.picker.pick(event.clientX, event.clientY);
+        this.updatePreview();
+        return;
+      }
+      // Moved before a long press completed: it's a camera pan.
+      press.cancelled = true;
+      this.clearLongPress();
       return;
     }
     if (event.pointerType === 'mouse') {
@@ -168,17 +258,23 @@ export class CityScreen implements Screen {
   private readonly onPointerUp = (event: PointerEvent): void => {
     this.activePointers.delete(event.pointerId);
     const press = this.press;
+    if (!press) return;
+    this.clearLongPress();
     this.press = null;
-    if (press && !press.cancelled) this.handleTap(this.picker.pick(event.clientX, event.clientY));
+    this.rig.controls.enabled = true;
+
+    const tile = this.picker.pick(event.clientX, event.clientY);
+    if (press.dragging) this.commitMove(tile, false);
+    else if (!press.cancelled) this.handleTap(tile);
   };
 
   private readonly onPointerCancel = (event: PointerEvent): void => {
     this.activePointers.delete(event.pointerId);
-    this.press = null;
+    this.abortPress();
   };
 
   private readonly onPointerLeave = (event: PointerEvent): void => {
-    if (event.pointerType !== 'mouse') return;
+    if (event.pointerType !== 'mouse' || this.press) return;
     this.hoverTile = null;
     this.updatePreview();
   };
@@ -188,16 +284,55 @@ export class CityScreen implements Screen {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') this.cancelTool();
+    if (event.key !== 'Escape') return;
+    this.cancelTool();
+    this.cancelMove();
   };
+
+  /** Picks up the pressed building: the press now drags it to a new tile. */
+  private beginDrag(): void {
+    const press = this.press;
+    if (!press || press.buildingId === null || press.cancelled) return;
+    press.dragging = true;
+    this.rig.controls.enabled = false;
+    this.movingBuildingId = press.buildingId;
+    if (press.pointerType !== 'mouse') {
+      navigator.vibrate?.(15);
+      this.hoverTile = this.picker.pick(press.x, press.y);
+    }
+    this.updatePreview();
+    this.refreshUI();
+  }
+
+  private abortPress(): void {
+    const press = this.press;
+    if (!press) return;
+    this.clearLongPress();
+    press.cancelled = true;
+    if (press.dragging) this.cancelMove();
+    this.press = null;
+    this.rig.controls.enabled = true;
+  }
+
+  private clearLongPress(): void {
+    if (this.press?.longPressTimer !== undefined) {
+      window.clearTimeout(this.press.longPressTimer);
+      this.press.longPressTimer = undefined;
+    }
+  }
 
   // --- Actions -----------------------------------------------------------------------------
 
   private handleTap(tile: TileCoord | null): void {
+    if (this.movingBuildingId !== null) {
+      this.commitMove(tile, true);
+      return;
+    }
+
     if (this.activeTool) {
       if (!tile) return;
       const result = placeBuilding(this.state, this.activeTool, tile.col, tile.row);
-      if (result.ok) this.buildings.sync(this.state.buildings);
+      if (result.ok) this.onCityChanged();
       else this.ui.showMessage(ACTION_ERROR_MESSAGES[result.error]);
       this.hoverTile = tile;
       this.updatePreview();
@@ -205,25 +340,145 @@ export class CityScreen implements Screen {
       return;
     }
 
+    this.select(tile);
+  }
+
+  private select(tile: TileCoord | null): void {
     this.selectedTile = tile;
     this.markers.setSelection(tile);
+    // One card at a time: a selected building replaces the research panel.
+    if (tile && getBuildingAt(this.state, tile.col, tile.row)) this.researchOpen = false;
+    this.refreshUI();
+  }
+
+  /**
+   * Moves the building being relocated to `tile`. In tap-to-move mode a rejected tile keeps the
+   * mode active so the player can try another; a rejected drag simply drops the building.
+   */
+  private commitMove(tile: TileCoord | null, keepModeOnFailure: boolean): void {
+    const buildingId = this.movingBuildingId;
+    if (buildingId === null) return;
+    if (!tile) {
+      if (!keepModeOnFailure) this.cancelMove();
+      return;
+    }
+
+    const result = moveBuilding(this.state, buildingId, tile.col, tile.row);
+    if (result.ok) {
+      this.movingBuildingId = null;
+      this.selectedTile = tile;
+      this.markers.setSelection(tile);
+      this.onCityChanged();
+    } else {
+      this.ui.showMessage(ACTION_ERROR_MESSAGES[result.error]);
+      if (!keepModeOnFailure) this.movingBuildingId = null;
+    }
+    this.updatePreview();
+    this.refreshUI();
+  }
+
+  /** After the player changes the city: redraw and re-evaluate effects immediately. */
+  private onCityChanged(): void {
+    this.buildings.sync(this.state.buildings);
+    this.recomputeReport();
+    this.updateProblems(true);
+    this.announceProgress();
+  }
+
+  private recomputeReport(): void {
+    this.report = computeCityReport(this.state);
+    this.state.resources.power = this.report.powerSupply - this.report.powerDemand;
+  }
+
+  private updateProblems(announce: boolean): void {
+    this.problems = detectProblems(this.state, this.report);
+    const kinds = new Set(this.problems.map((problem) => problem.kind));
+    if (announce) {
+      const fresh = this.problems.find((problem) => !this.announcedProblems.has(problem.kind));
+      if (fresh) this.ui.showMessage(problemText(fresh));
+    }
+    this.announcedProblems = kinds;
+  }
+
+  /** Announces level-ups (highlighting what they unlock) and finished research. */
+  private announceProgress(): void {
+    const completed = this.state.research.completed;
+    if (completed.length > this.seenResearchCount) {
+      const latest = completed[completed.length - 1];
+      this.seenResearchCount = completed.length;
+      this.ui.showMessage(`Research complete: ${RESEARCH[latest].name}`);
+      // Its bonuses apply now, not on the next tick.
+      this.recomputeReport();
+    }
+
+    if (this.state.cityLevel > this.seenLevel) {
+      const unlocked: BuildingType[] = [];
+      for (let level = this.seenLevel + 1; level <= this.state.cityLevel; level++) {
+        unlocked.push(...unlocksAtLevel(level).filter((type) => getUnlockState(type, this.state) === 'available'));
+      }
+      this.seenLevel = this.state.cityLevel;
+      const names = unlocked.map((type) => buildingName(type, this.state.era));
+      this.ui.showMessage(
+        `City level ${this.state.cityLevel}!${names.length ? ` New: ${names.join(', ')}` : ''}`,
+      );
+      if (unlocked.length) {
+        this.newUnlocks = new Set(unlocked);
+        this.newUnlocksUntil = performance.now() + NEW_UNLOCK_HIGHLIGHT_MS;
+      }
+    }
+  }
+
+  /** Auto focus: show where a city problem is. */
+  private focusProblem(kind: ProblemKind): void {
+    const focus = this.problems.find((problem) => problem.kind === kind)?.focus;
+    if (!focus) return;
+    this.rig.focusTile(focus.col, focus.row);
+    this.select(focus);
+  }
+
+  private toggleResearch(): void {
+    this.researchOpen = !this.researchOpen;
+    if (this.researchOpen) {
+      this.selectedTile = null;
+      this.markers.setSelection(null);
+    }
+    this.refreshUI();
+  }
+
+  private beginResearch(id: ResearchId): void {
+    const result = startResearch(this.state, id);
+    if (!result.ok) this.ui.showMessage(RESEARCH_ERROR_MESSAGES[result.error]);
     this.refreshUI();
   }
 
   private updatePreview(): void {
-    if (!this.activeTool || !this.hoverTile) {
-      this.markers.hidePreview();
+    const tile = this.hoverTile;
+    if (tile && this.activeTool) {
+      const valid = validatePlacement(this.state, this.activeTool, tile.col, tile.row) === null;
+      this.markers.showPreview(this.activeTool, 1, tile, valid);
       return;
     }
-    const { col, row } = this.hoverTile;
-    const valid = validatePlacement(this.state, this.activeTool, col, row) === null;
-    this.markers.showPreview(this.activeTool, this.hoverTile, valid);
+    const moving = this.movingBuilding();
+    if (tile && moving) {
+      const valid = validateMove(this.state, moving.id, tile.col, tile.row) === null;
+      this.markers.showPreview(moving.type, moving.level, tile, valid);
+      return;
+    }
+    this.markers.hidePreview();
+  }
+
+  private movingBuilding(): Building | undefined {
+    return this.movingBuildingId === null
+      ? undefined
+      : this.state.buildings.find((b) => b.id === this.movingBuildingId);
   }
 
   private selectTool(type: BuildingType): void {
     this.activeTool = this.activeTool === type ? null : type;
+    this.movingBuildingId = null;
     this.selectedTile = null;
     this.markers.setSelection(null);
+    this.newUnlocks.delete(type);
     this.updatePreview();
     this.refreshUI();
   }
@@ -234,9 +489,23 @@ export class CityScreen implements Screen {
     this.refreshUI();
   }
 
+  /** Panel "Move" button: enter tap-to-move mode for the building, or leave it. */
+  private toggleMove(buildingId: number): void {
+    this.activeTool = null;
+    this.movingBuildingId = this.movingBuildingId === buildingId ? null : buildingId;
+    this.updatePreview();
+    this.refreshUI();
+  }
+
+  private cancelMove(): void {
+    this.movingBuildingId = null;
+    this.updatePreview();
+    this.refreshUI();
+  }
+
   private upgrade(buildingId: number): void {
     const result = upgradeBuilding(this.state, buildingId);
-    if (result.ok) this.buildings.sync(this.state.buildings);
+    if (result.ok) this.onCityChanged();
     else this.ui.showMessage(ACTION_ERROR_MESSAGES[result.error]);
     this.refreshUI();
   }
@@ -247,6 +516,7 @@ export class CityScreen implements Screen {
       this.ground.syncTerritory(this.state);
       // Auto focus: frame the newly unlocked territory.
       this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
+      this.announceProgress();
     } else {
       this.ui.showMessage(ACTION_ERROR_MESSAGES[result.error]);
     }
@@ -255,20 +525,98 @@ export class CityScreen implements Screen {
 
   private clearSelection(): void {
     this.selectedTile = null;
+    this.movingBuildingId = null;
     this.markers.setSelection(null);
+    this.updatePreview();
     this.refreshUI();
+  }
+
+  // --- View --------------------------------------------------------------------------------
+
+  private buildOptions(): BuildOption[] {
+    if (performance.now() > this.newUnlocksUntil) this.newUnlocks.clear();
+    return BUILDABLE_TYPES.map((type) => ({
+      type,
+      name: buildingName(type, this.state.era),
+      cost: getBuildCost(type, this.state.era),
+      unlock: getUnlockState(type, this.state),
+      requiredLevel: BUILDINGS[type].cityLevel,
+      isNew: this.newUnlocks.has(type),
+    }));
+  }
+
+  private cityInfo(): CityInfo {
+    const level = this.state.cityLevel;
+    return {
+      level,
+      xp: this.state.cityXp,
+      xpToNext: isMaxLevel(level) ? null : xpToNextLevel(level),
+      nextUnlocks: unlocksAtLevel(level + 1)
+        .filter((type) => getUnlockState(type, { ...this.state, cityLevel: level + 1 }) === 'available')
+        .map((type) => buildingName(type, this.state.era)),
+    };
+  }
+
+  private researchView(): ResearchPanelView {
+    const state = this.state;
+    const cards: ResearchCard[] = [];
+    for (const id of RESEARCH_IDS) {
+      const status = getResearchStatus(state, id);
+      if (status === 'laterEra') continue;
+      const definition = RESEARCH[id];
+      cards.push({
+        id,
+        name: definition.name,
+        description: definition.description,
+        eraName: ERA_SETTINGS[definition.era].name,
+        cost: definition.cost,
+        status,
+        progress: state.research.active?.id === id ? state.research.active.progress / definition.points : 0,
+        missing: definition.requires
+          .filter((required) => !state.research.completed.includes(required))
+          .map((required) => RESEARCH[required].name),
+      });
+    }
+    return {
+      open: this.researchOpen,
+      canResearch: hasResearchBuilding(state),
+      buildingName: buildingName('researchCenter', state.era),
+      pointsPerSecond: this.report.researchPerSecond,
+      gold: state.resources.gold,
+      busy: state.research.active !== null,
+      cards,
+    };
+  }
+
+  private hintText(): string | null {
+    if (this.activeTool) {
+      return `Tap a tile to place a ${buildingName(this.activeTool, this.state.era)}. Tap the button again to stop.`;
+    }
+    const moving = this.movingBuilding();
+    if (moving) return `Tap a tile to move the ${buildingName(moving.type, this.state.era)}.`;
+    return null;
   }
 
   private refreshUI(): void {
     const selectedBuilding = this.selectedTile
       ? (getBuildingAt(this.state, this.selectedTile.col, this.selectedTile.row) ?? null)
       : null;
+    const active = this.state.research.active;
     this.ui.update({
       resources: this.state.resources,
+      era: this.state.era,
+      buildOptions: this.buildOptions(),
       activeTool: this.activeTool,
       selectedBuilding,
       selectedOccupancy: selectedBuilding ? getOccupancy(this.state, selectedBuilding) : null,
+      selectedReport: selectedBuilding ? (this.report.buildings.get(selectedBuilding.id) ?? null) : null,
+      city: selectedBuilding?.type === 'townHall' ? this.cityInfo() : null,
+      movingBuildingId: this.movingBuildingId,
+      problems: this.problems,
+      research: this.researchView(),
+      researchProgress: active ? active.progress / RESEARCH[active.id].points : null,
       expansionCost: getExpansionCost(this.state.expansionLevel),
+      hint: this.hintText(),
     });
   }
 }

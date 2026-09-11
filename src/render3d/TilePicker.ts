@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Building } from '../building/types';
 import { SCENE_3D } from '../config/gameConfig';
 import { isInsideWorld } from '../world/territory';
 import type { BuildingView } from './BuildingView';
@@ -20,16 +21,25 @@ export class TilePicker {
     private readonly buildings: BuildingView,
   ) {}
 
-  pick(clientX: number, clientY: number): TileCoord | null {
-    const rect = this.canvas.getBoundingClientRect();
-    this.ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
-    this.raycaster.setFromCamera(this.ndc, this.camera);
+  /** The building under the pointer, if any. */
+  pickBuilding(clientX: number, clientY: number): Building | null {
+    this.aim(clientX, clientY);
+    return this.buildings.pick(this.raycaster);
+  }
 
+  pick(clientX: number, clientY: number): TileCoord | null {
+    this.aim(clientX, clientY);
     const building = this.buildings.pick(this.raycaster);
     if (building) return { col: building.col, row: building.row };
 
     if (!this.raycaster.ray.intersectPlane(this.ground, this.hit)) return null;
     const tile = worldToTile(this.hit.x, this.hit.z);
     return isInsideWorld(tile.col, tile.row) ? tile : null;
+  }
+
+  private aim(clientX: number, clientY: number): void {
+    const rect = this.canvas.getBoundingClientRect();
+    this.ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.ndc, this.camera);
   }
 }

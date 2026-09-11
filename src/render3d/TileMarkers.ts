@@ -55,13 +55,13 @@ export class TileMarkers {
     if (tile) this.selection.position.copy(tileToWorld(tile.col, tile.row, this.position));
   }
 
-  showPreview(type: BuildingType, tile: TileCoord, valid: boolean): void {
+  showPreview(type: BuildingType, level: number, tile: TileCoord, valid: boolean): void {
     tileToWorld(tile.col, tile.row, this.position);
     this.previewTile.position.copy(this.position).setY(SCENE_3D.tileTop + 0.006);
     this.previewTile.material.color.setHex(valid ? MARKERS.previewValid : MARKERS.previewInvalid);
     this.previewTile.visible = true;
 
-    this.ghost.geometry = getBuildingGeometry(type, 1);
+    this.ghost.geometry = getBuildingGeometry(type, level);
     this.ghost.position.copy(this.position);
     this.ghost.visible = true;
   }

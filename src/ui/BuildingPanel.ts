@@ -1,15 +1,39 @@
-import { canUpgradeFurther, getBuildingOutput, getUpgradeCost } from '../building/rules';
+import { buildingName, canUpgradeFurther, getBuildingOutput, getUpgradeCost } from '../building/rules';
 import type { Building } from '../building/types';
 import type { Occupancy } from '../citizen/occupancy';
 import { BUILDINGS } from '../config/balance';
+import type { BuildingReport } from '../economy/cityReport';
+import type { EraId } from '../progression/era';
 import { button, el, setText } from './dom';
 import { formatAmount, formatRate } from './format';
 import { BUILDING_ICONS, icon, type IconName } from './icons';
-import { BUILDING_DESCRIPTIONS } from './messages';
+import { BUILDING_DESCRIPTIONS, effectText } from './messages';
 
 export interface BuildingPanelHandlers {
   onUpgrade(buildingId: number): void;
+  onMove(buildingId: number): void;
   onClose(): void;
+}
+
+/** City status shown on the Town Hall's card. */
+export interface CityInfo {
+  level: number;
+  xp: number;
+  /** XP needed for the next level, or null at max level. */
+  xpToNext: number | null;
+  /** Names of buildings the next level unlocks. */
+  nextUnlocks: string[];
+}
+
+export interface BuildingPanelView {
+  building: Building | null;
+  city: CityInfo | null;
+  occupancy: Occupancy | null;
+  report: BuildingReport | null;
+  era: EraId;
+  gold: number;
+  /** Whether this building is currently being relocated. */
+  moving: boolean;
 }
 
 interface StatRow {
@@ -29,7 +53,7 @@ function showStat(stat: StatRow, visible: boolean, text: string): void {
   if (visible) setText(stat.text, text);
 }
 
-/** Card for the selected building: name, level, output, occupancy and the upgrade action. */
+/** Card for the selected building: output, effects, occupancy, upgrade and move. */
 export class BuildingPanel {
   readonly element = el('section', 'panel building-panel');
   private readonly badge = el('div', 'panel-badge');
@@ -41,12 +65,23 @@ export class BuildingPanel {
     capacity: statRow('home', 'stat-pop'),
     jobs: statRow('store', 'stat-jobs'),
     happiness: statRow('smile', 'stat-happy'),
+    power: statRow('zap', 'stat-power'),
+    efficiency: statRow('gauge', 'stat-efficiency'),
     occupancy: statRow('users', 'stat-pop'),
   };
   private readonly statList = el('ul', 'panel-stats');
+  private readonly city = el('div', 'panel-city');
+  private readonly cityLevel = el('strong');
+  private readonly cityXp = el('span', 'panel-city-xp');
+  private readonly cityXpFill = el('div', 'progress-fill is-xp');
+  private readonly cityNote = el('div', 'panel-city-note');
+  private readonly effects = el('ul', 'panel-effects');
+  private readonly actions = el('div', 'panel-actions');
   private readonly upgradeButton: HTMLButtonElement;
-  private readonly upgradeLabel: HTMLElement;
   private readonly upgradeCost = el('span', 'btn-cost');
+  private readonly moveButton: HTMLButtonElement;
+  private readonly moveLabel: HTMLElement;
+  private renderedEffects = '';
   private buildingId: number | null = null;
   private badgeType: string | null = null;
 
@@ -69,16 +104,33 @@ export class BuildingPanel {
         if (this.buildingId !== null) handlers.onUpgrade(this.buildingId);
       },
     });
-    this.upgradeLabel = this.upgradeButton.querySelector('.btn-label')!;
     this.upgradeButton.append(this.upgradeCost);
+
+    this.moveButton = button({
+      icon: 'move',
+      label: 'Move',
+      className: 'move-button',
+      onClick: () => {
+        if (this.buildingId !== null) handlers.onMove(this.buildingId);
+      },
+    });
+    this.moveLabel = this.moveButton.querySelector('.btn-label')!;
+    this.actions.append(this.upgradeButton, this.moveButton);
 
     this.statList.append(...Object.values(this.stats).map((stat) => stat.row));
 
-    this.element.append(header, this.description, this.statList, this.upgradeButton);
+    const cityTitle = el('div', 'panel-city-title');
+    cityTitle.append(this.cityLevel, this.cityXp);
+    const xpTrack = el('div', 'progress');
+    xpTrack.append(this.cityXpFill);
+    this.city.append(cityTitle, xpTrack, this.cityNote);
+
+    this.element.append(header, this.description, this.city, this.statList, this.effects, this.actions);
     this.element.hidden = true;
   }
 
-  update(building: Building | null, occupancy: Occupancy | null, gold: number): void {
+  update(view: BuildingPanelView): void {
+    const { building, report } = view;
     this.element.hidden = building === null;
     this.buildingId = building?.id ?? null;
     if (!building) return;
@@ -89,12 +141,25 @@ export class BuildingPanel {
       this.badge.replaceChildren(icon(BUILDING_ICONS[building.type]));
       this.badgeType = building.type;
     }
-    setText(this.title, definition.name);
+    setText(this.title, buildingName(building.type, view.era));
     setText(this.level, `Level ${building.level} of ${definition.maxLevel}`);
     setText(this.description, BUILDING_DESCRIPTIONS[building.type]);
 
+    this.city.hidden = view.city === null;
+    if (view.city) {
+      const { level, xp, xpToNext, nextUnlocks } = view.city;
+      setText(this.cityLevel, `City level ${level}`);
+      setText(this.cityXp, xpToNext === null ? 'Max level' : `${formatAmount(xp)} / ${formatAmount(xpToNext)} XP`);
+      this.cityXpFill.style.width = xpToNext === null ? '100%' : `${Math.min(100, (xp / xpToNext) * 100)}%`;
+      this.cityNote.hidden = nextUnlocks.length === 0;
+      setText(this.cityNote, `Next level unlocks: ${nextUnlocks.join(', ')}`);
+    }
+
+    const gold = report?.goldPerSecond ?? output.goldPerSecond;
     const happinessSign = output.happinessBonus > 0 ? '+' : '';
-    showStat(this.stats.gold, output.goldPerSecond > 0, `+${formatRate(output.goldPerSecond)} gold/s`);
+    const powerSupply = report?.powerSupply ?? output.powerSupply;
+    const powerDemand = report?.powerDemand ?? output.powerDemand;
+    showStat(this.stats.gold, gold > 0, `+${formatRate(gold)} gold/s`);
     showStat(this.stats.capacity, output.populationCapacity > 0, `Houses ${output.populationCapacity}`);
     showStat(this.stats.jobs, output.jobs > 0, `${output.jobs} jobs`);
     showStat(
@@ -103,27 +168,45 @@ export class BuildingPanel {
       `${happinessSign}${formatRate(output.happinessBonus)} happiness`,
     );
     showStat(
+      this.stats.power,
+      powerSupply > 0 || powerDemand > 0,
+      powerSupply > 0 ? `+${formatRate(powerSupply)} power` : `Uses ${formatRate(powerDemand)} power`,
+    );
+    const efficiency = report?.efficiency ?? 1;
+    showStat(this.stats.efficiency, efficiency < 1, `Working at ${Math.round(efficiency * 100)}%`);
+    showStat(
       this.stats.occupancy,
-      occupancy !== null,
-      occupancy
-        ? `${occupancy.kind === 'residents' ? 'Residents' : 'Workers'} ${occupancy.count} / ${occupancy.capacity}`
+      view.occupancy !== null,
+      view.occupancy
+        ? `${view.occupancy.kind === 'residents' ? 'Residents' : 'Workers'} ${view.occupancy.count} / ${view.occupancy.capacity}`
         : '',
     );
     // Buildings without any output (e.g. the Town Hall) get no empty stats box.
     this.statList.hidden = Object.values(this.stats).every((stat) => stat.row.hidden);
 
+    const effectTexts = (report?.effects ?? []).map(effectText);
+    const signature = effectTexts.join('|');
+    if (signature !== this.renderedEffects) {
+      this.renderedEffects = signature;
+      this.effects.replaceChildren(...effectTexts.map((text) => el('li', undefined, text)));
+    }
+    this.effects.hidden = effectTexts.length === 0;
+
     this.upgradeButton.hidden = definition.maxLevel <= 1;
     if (canUpgradeFurther(building)) {
-      const cost = getUpgradeCost(building);
-      setText(this.upgradeLabel, `Upgrade to Lv ${building.level + 1}`);
+      const cost = getUpgradeCost(building, view.era);
       setText(this.upgradeCost, `${formatAmount(cost)}g`);
       this.upgradeCost.hidden = false;
-      this.upgradeCost.classList.toggle('is-unaffordable', gold < cost);
+      this.upgradeCost.classList.toggle('is-unaffordable', view.gold < cost);
       this.upgradeButton.disabled = false;
     } else {
-      setText(this.upgradeLabel, 'Max level');
       this.upgradeCost.hidden = true;
       this.upgradeButton.disabled = true;
     }
+
+    this.moveButton.hidden = !definition.movable;
+    this.moveButton.classList.toggle('btn-primary', view.moving);
+    setText(this.moveLabel, view.moving ? 'Cancel move' : 'Move');
+    this.actions.hidden = this.upgradeButton.hidden && this.moveButton.hidden;
   }
 }

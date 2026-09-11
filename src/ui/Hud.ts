@@ -7,7 +7,7 @@ import { icon, type IconName } from './icons';
 const RESOURCES: readonly { key: keyof Resources; label: string; icon: IconName }[] = [
   { key: 'gold', label: 'Gold', icon: 'coins' },
   { key: 'population', label: 'Population', icon: 'users' },
-  { key: 'power', label: 'Power', icon: 'zap' },
+  { key: 'power', label: 'Spare power', icon: 'zap' },
   { key: 'happiness', label: 'Happiness', icon: 'smile' },
 ];
 
@@ -29,8 +29,16 @@ export class Hud {
   }
 
   update(resources: Resources): void {
-    for (const [key, { value }] of this.chips) setText(value, formatAmount(resources[key]));
+    for (const [key, { value }] of this.chips) {
+      setText(value, key === 'power' ? formatSigned(resources.power) : formatAmount(resources[key]));
+    }
+    this.chips.get('power')!.chip.dataset.state = resources.power < 0 ? 'shortage' : 'ok';
     // The happiness icon changes colour with the city's mood.
     this.chips.get('happiness')!.chip.dataset.mood = getMood(resources.happiness);
   }
+}
+
+function formatSigned(value: number): string {
+  const rounded = Math.round(value);
+  return rounded > 0 ? `+${formatAmount(rounded)}` : formatAmount(rounded);
 }

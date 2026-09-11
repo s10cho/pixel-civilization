@@ -36,6 +36,8 @@ export const CAMERA = {
   fitHeight: 1.2,
   /** Pointer travel (screen px) before a press counts as a camera drag rather than a tap. */
   dragThresholdPx: 8,
+  /** Touch: holding a building this long picks it up for moving. */
+  longPressMs: 450,
 } as const;
 
 export const SCENE_3D = {

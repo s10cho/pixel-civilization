@@ -1,37 +1,63 @@
-import { BUILDABLE_TYPES } from '../building/rules';
+import { BUILDABLE_TYPES, type UnlockState } from '../building/rules';
 import type { BuildingType } from '../building/types';
-import { BUILDINGS } from '../config/balance';
-import { button, el } from './dom';
+import { button, el, setText } from './dom';
 import { formatAmount } from './format';
 import { BUILDING_ICONS } from './icons';
 
-/** Build menu: one toggle button per buildable type, with its icon and cost. */
+/** What the build menu shows for one building type in the current era. */
+export interface BuildOption {
+  type: BuildingType;
+  name: string;
+  cost: number;
+  unlock: UnlockState;
+  requiredLevel: number;
+  /** Recently unlocked: the button pulses to draw attention. */
+  isNew: boolean;
+}
+
+interface Entry {
+  node: HTMLButtonElement;
+  label: HTMLElement;
+  cost: HTMLElement;
+  lock: HTMLElement;
+}
+
+/**
+ * Build menu: one toggle button per buildable type with its era name and cost. Types waiting
+ * for a city level show the level they need; types from a later era stay hidden.
+ */
 export class BuildBar {
   readonly element = el('div', 'build-bar');
-  private readonly buttons = new Map<BuildingType, { node: HTMLButtonElement; cost: HTMLElement }>();
+  private readonly entries = new Map<BuildingType, Entry>();
 
   constructor(onSelect: (type: BuildingType) => void) {
     for (const type of BUILDABLE_TYPES) {
-      const definition = BUILDINGS[type];
-      const node = button({
-        icon: BUILDING_ICONS[type],
-        label: definition.name,
-        onClick: () => onSelect(type),
-      });
-      const cost = el('span', 'btn-cost', `${formatAmount(definition.buildCost)}g`);
-      node.append(cost);
+      const node = button({ icon: BUILDING_ICONS[type], label: '', onClick: () => onSelect(type) });
+      const cost = el('span', 'btn-cost');
+      const lock = el('span', 'btn-lock');
+      node.append(cost, lock);
       node.dataset.building = type;
-      this.buttons.set(type, { node, cost });
+      this.entries.set(type, { node, label: node.querySelector('.btn-label')!, cost, lock });
       this.element.append(node);
     }
   }
 
-  update(activeTool: BuildingType | null, gold: number): void {
-    for (const [type, { node, cost }] of this.buttons) {
-      const active = type === activeTool;
-      node.classList.toggle('btn-primary', active);
-      node.setAttribute('aria-pressed', String(active));
-      cost.classList.toggle('is-unaffordable', gold < BUILDINGS[type].buildCost);
+  update(options: readonly BuildOption[], activeTool: BuildingType | null, gold: number): void {
+    for (const option of options) {
+      const entry = this.entries.get(option.type);
+      if (!entry) continue;
+      const locked = option.unlock === 'needsLevel';
+      entry.node.hidden = option.unlock === 'needsEra';
+      entry.node.disabled = locked;
+      entry.node.classList.toggle('btn-primary', option.type === activeTool);
+      entry.node.classList.toggle('is-new', option.isNew && !locked);
+      entry.node.setAttribute('aria-pressed', String(option.type === activeTool));
+      setText(entry.label, option.name);
+      entry.cost.hidden = locked;
+      setText(entry.cost, `${formatAmount(option.cost)}g`);
+      entry.cost.classList.toggle('is-unaffordable', gold < option.cost);
+      entry.lock.hidden = !locked;
+      setText(entry.lock, `Lv ${option.requiredLevel}`);
     }
   }
 }

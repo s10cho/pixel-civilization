@@ -68,6 +68,12 @@ export class CameraRig {
     this.controls.update();
   }
 
+  /** Pans so the tile is at the centre of the view, keeping zoom and yaw. */
+  focusTile(col: number, row: number): void {
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    this.placeCamera(tileToWorld(col, row).setY(0), Math.atan2(offset.x, offset.z));
+  }
+
   dispose(): void {
     this.controls.removeEventListener('change', this.keepTargetInWorld);
     this.controls.dispose();
