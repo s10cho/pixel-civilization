@@ -1,0 +1,193 @@
+:root {
+  --ui-bg: rgba(27, 31, 42, 0.88);
+  --ui-border: #e8d8a8;
+  --ui-text: #f4ecd0;
+  --ui-muted: #8a8fa0;
+  --ui-button: #2e3648;
+  --ui-button-hover: #3d4760;
+  --ui-active: #6b5a22;
+  --ui-error: #ff8a7a;
+  --ui-gap: 8px;
+}
+
+/* The overlay never blocks the canvas except where an element opts in (buttons, panels). */
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  color: var(--ui-text);
+  font: 14px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+#ui [hidden] {
+  display: none !important;
+}
+
+.city-ui {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: max(var(--ui-gap), env(safe-area-inset-top)) max(var(--ui-gap), env(safe-area-inset-right))
+    max(var(--ui-gap), env(safe-area-inset-bottom)) max(var(--ui-gap), env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.top-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-gap);
+}
+
+.menu-button {
+  margin-left: auto;
+}
+
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hud-resource {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--ui-bg);
+  border: 2px solid var(--ui-border);
+}
+
+.hud-label {
+  color: var(--ui-muted);
+}
+
+.hud-value {
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .hud-resource {
+    padding: 4px 6px;
+    gap: 4px;
+    font-size: 12px;
+  }
+}
+
+.bottom-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-gap);
+}
+
+.build-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--ui-gap);
+}
+
+.ui-button {
+  pointer-events: auto;
+  min-height: 44px;
+  padding: 8px 14px;
+  font: inherit;
+  color: inherit;
+  background: var(--ui-button);
+  border: 2px solid var(--ui-border);
+  border-radius: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ui-button:hover:not(:disabled) {
+  background: var(--ui-button-hover);
+}
+
+.ui-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ui-button.active {
+  background: var(--ui-active);
+}
+
+.ui-button.unaffordable {
+  color: var(--ui-muted);
+}
+
+.panel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  background: var(--ui-bg);
+  border: 2px solid var(--ui-border);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.panel-text {
+  margin: 0;
+}
+
+.panel-muted {
+  color: var(--ui-muted);
+}
+
+.close-button {
+  min-height: 32px;
+  padding: 2px 10px;
+}
+
+/* Desktop: panel docks to the right side under the HUD. */
+.building-panel {
+  position: absolute;
+  top: 64px;
+  right: max(var(--ui-gap), env(safe-area-inset-right));
+  width: 240px;
+}
+
+/* Mobile: panel docks to the bottom, above the build bar. */
+@media (max-width: 600px) {
+  .building-panel {
+    top: auto;
+    left: max(var(--ui-gap), env(safe-area-inset-left));
+    right: max(var(--ui-gap), env(safe-area-inset-right));
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    width: auto;
+  }
+}
+
+.hint,
+.toast {
+  padding: 6px 10px;
+  text-align: center;
+  background: var(--ui-bg);
+  border: 2px solid var(--ui-border);
+}
+
+.toast {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  border-color: var(--ui-error);
+}
