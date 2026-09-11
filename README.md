@@ -16,28 +16,30 @@ npm run preview    # serve the production build
 
 ```
 src/
-  main.ts          entry point, creates the Phaser game
-  config/          tunable constants and Phaser game config
-  scenes/          BootScene, MenuScene, CityScene (EraTransitionScene later)
-  simulation/      pure gameplay logic, independent of Phaser
-  world/           tiles, regions, placement, expansion
-  citizen/         citizen entities and behavior
-  building/        building definitions, upgrades, evolution
-  progression/     city level, unlocks, eras
-  research/        research tree
-  economy/         resources and offline production
-  rendering/       Phaser-side presentation helpers (placeholder textures for now)
-  ui/              DOM overlay UI (HUD, build bar, panels, main menu)
-  persistence/     IndexedDB save slots, localStorage preferences
-  audio/           BGM and sound effects
+  main.ts          entry point, switches between screens
+  config/          engine/presentation constants (gameConfig) and gameplay balance (balance)
+  screens/         MenuScreen, CityScreen
+  render3d/        Three.js city view: stage, camera, ground, buildings, citizens, picking
+  simulation/      game state, fixed-step tick, player actions (no rendering code)
+  world/           tiles, territory, placement rules
+  citizen/         simulated citizens: assignment, daily routine, occupancy
+  building/        building types and level rules
+  economy/         production and happiness
+  progression/     city level, unlocks, eras (later)
+  research/        research tree (later)
+  ui/              DOM overlay UI (HUD, build dock, building card, main menu)
+  persistence/     IndexedDB save slots, localStorage preferences (later)
+  audio/           BGM and sound effects (later)
+docs/              design notes (3D transition plan)
 ```
+
+Rendering quality can be forced with `?quality=high|medium|low` (default high).
 
 ## UI libraries
 
-The DOM UI uses [NES.css](https://github.com/nostalgic-css/NES.css) (MIT) for pixel-art
-components, the [Galmuri](https://github.com/quiple/galmuri) pixel font (SIL OFL 1.1, with Hangul)
-and [pixelarticons](https://github.com/halfmage/pixelarticons) (MIT). Their licenses ship with the
-build under `public/licenses/`.
+The city is rendered with [Three.js](https://threejs.org/) (MIT) as a low-poly isometric scene;
+see `docs/3d-transition-plan.md`. The DOM UI uses system fonts and
+[Lucide](https://lucide.dev/) icons (ISC, license under `public/licenses/`).
 
 ## Deployment
 

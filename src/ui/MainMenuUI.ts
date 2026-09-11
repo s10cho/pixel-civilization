@@ -1,4 +1,5 @@
 import { button, el } from './dom';
+import { icon } from './icons';
 
 export interface MainMenuHandlers {
   onNewGame(): void;
@@ -18,6 +19,7 @@ export class MainMenuUI {
     );
 
     this.element.append(
+      icon('building', 'main-menu-logo'),
       el('h1', 'main-menu-title', 'Pixel Civilization'),
       el('p', 'main-menu-subtitle', 'Build a tiny settlement into a great civilization'),
       buttons,

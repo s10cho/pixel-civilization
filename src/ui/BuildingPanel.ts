@@ -2,9 +2,9 @@ import { canUpgradeFurther, getBuildingOutput, getUpgradeCost } from '../buildin
 import type { Building } from '../building/types';
 import type { Occupancy } from '../citizen/occupancy';
 import { BUILDINGS } from '../config/balance';
-import { button, el, setDisabled, setText } from './dom';
+import { button, el, setText } from './dom';
 import { formatAmount, formatRate } from './format';
-import { icon, type IconName } from './icons';
+import { BUILDING_ICONS, icon, type IconName } from './icons';
 import { BUILDING_DESCRIPTIONS } from './messages';
 
 export interface BuildingPanelHandlers {
@@ -29,11 +29,12 @@ function showStat(stat: StatRow, visible: boolean, text: string): void {
   if (visible) setText(stat.text, text);
 }
 
-/** Details for the selected building: name, level, output, occupancy and the upgrade action. */
+/** Card for the selected building: name, level, output, occupancy and the upgrade action. */
 export class BuildingPanel {
-  readonly element = el('section', 'nes-container is-dark with-title panel building-panel');
-  private readonly title = el('p', 'title');
-  private readonly level = el('div', 'panel-level');
+  readonly element = el('section', 'panel building-panel');
+  private readonly badge = el('div', 'panel-badge');
+  private readonly title = el('h2', 'panel-title');
+  private readonly level = el('div', 'panel-subtitle');
   private readonly description = el('p', 'panel-text');
   private readonly stats = {
     gold: statRow('coins', 'stat-gold'),
@@ -42,18 +43,22 @@ export class BuildingPanel {
     happiness: statRow('smile', 'stat-happy'),
     occupancy: statRow('users', 'stat-pop'),
   };
+  private readonly statList = el('ul', 'panel-stats');
   private readonly upgradeButton: HTMLButtonElement;
   private readonly upgradeLabel: HTMLElement;
   private readonly upgradeCost = el('span', 'btn-cost');
   private buildingId: number | null = null;
+  private badgeType: string | null = null;
 
   constructor(handlers: BuildingPanelHandlers) {
-    const closeButton = button({
-      icon: 'close',
-      ariaLabel: 'Close',
-      className: 'close-button',
-      onClick: handlers.onClose,
-    });
+    const heading = el('div', 'panel-heading');
+    heading.append(this.title, this.level);
+    const header = el('header', 'panel-header');
+    header.append(
+      this.badge,
+      heading,
+      button({ icon: 'close', ariaLabel: 'Close', className: 'btn-icon close-button', onClick: handlers.onClose }),
+    );
 
     this.upgradeButton = button({
       icon: 'arrowUp',
@@ -67,18 +72,9 @@ export class BuildingPanel {
     this.upgradeLabel = this.upgradeButton.querySelector('.btn-label')!;
     this.upgradeButton.append(this.upgradeCost);
 
-    const statList = el('ul', 'panel-stats');
-    statList.append(...Object.values(this.stats).map((stat) => stat.row));
+    this.statList.append(...Object.values(this.stats).map((stat) => stat.row));
 
-    // NES.css expects the `.title` element first inside a `.with-title` container.
-    this.element.append(
-      this.title,
-      closeButton,
-      this.level,
-      this.description,
-      statList,
-      this.upgradeButton,
-    );
+    this.element.append(header, this.description, this.statList, this.upgradeButton);
     this.element.hidden = true;
   }
 
@@ -89,8 +85,12 @@ export class BuildingPanel {
 
     const definition = BUILDINGS[building.type];
     const output = getBuildingOutput(building);
+    if (this.badgeType !== building.type) {
+      this.badge.replaceChildren(icon(BUILDING_ICONS[building.type]));
+      this.badgeType = building.type;
+    }
     setText(this.title, definition.name);
-    setText(this.level, `Lv ${building.level} / ${definition.maxLevel}`);
+    setText(this.level, `Level ${building.level} of ${definition.maxLevel}`);
     setText(this.description, BUILDING_DESCRIPTIONS[building.type]);
 
     const happinessSign = output.happinessBonus > 0 ? '+' : '';
@@ -109,6 +109,8 @@ export class BuildingPanel {
         ? `${occupancy.kind === 'residents' ? 'Residents' : 'Workers'} ${occupancy.count} / ${occupancy.capacity}`
         : '',
     );
+    // Buildings without any output (e.g. the Town Hall) get no empty stats box.
+    this.statList.hidden = Object.values(this.stats).every((stat) => stat.row.hidden);
 
     this.upgradeButton.hidden = definition.maxLevel <= 1;
     if (canUpgradeFurther(building)) {
@@ -117,11 +119,11 @@ export class BuildingPanel {
       setText(this.upgradeCost, `${formatAmount(cost)}g`);
       this.upgradeCost.hidden = false;
       this.upgradeCost.classList.toggle('is-unaffordable', gold < cost);
-      setDisabled(this.upgradeButton, false);
+      this.upgradeButton.disabled = false;
     } else {
       setText(this.upgradeLabel, 'Max level');
       this.upgradeCost.hidden = true;
-      setDisabled(this.upgradeButton, true);
+      this.upgradeButton.disabled = true;
     }
   }
 }

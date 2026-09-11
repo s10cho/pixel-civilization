@@ -1,30 +1,40 @@
 /*
- * Game UI on top of NES.css (pixel-art components) with the Galmuri pixel font and
- * pixelarticons icons. Loaded after NES.css so these rules win.
+ * Game UI: soft white cards over the 3D city, system fonts (with Hangul coverage) and Lucide
+ * line icons.
  */
 
 :root {
-  --ui-font: Galmuri11, ui-monospace, Menlo, Consolas, monospace;
-  --ui-ground: #1b1f2a;
-  --ui-panel: #212529;
-  --ui-panel-soft: rgba(33, 37, 41, 0.92);
-  --ui-frame: #f4ecd0;
-  --ui-text: #f4ecd0;
-  --ui-muted: #a3a7b3;
-  --ui-gold: #f7d51d;
-  --ui-pop: #6ec6ff;
-  --ui-power: #ffb03b;
-  --ui-happy: #92cc41;
-  --ui-neutral: #f7d51d;
-  --ui-unhappy: #e76e55;
-  --ui-error: #e76e55;
+  --ui-font: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', Pretendard, 'Noto Sans KR',
+    'Malgun Gothic', 'Segoe UI', Roboto, sans-serif;
+  --ui-sky: #a8d8ea;
+  --ui-card: rgba(255, 255, 255, 0.88);
+  --ui-card-solid: #ffffff;
+  --ui-line: rgba(31, 42, 58, 0.08);
+  --ui-shadow: 0 6px 18px rgba(28, 45, 70, 0.16);
+  --ui-shadow-strong: 0 14px 36px rgba(28, 45, 70, 0.24);
+  --ui-text: #1f2a3a;
+  --ui-muted: #6b7686;
+  --ui-accent: #2f7cf6;
+  --ui-accent-hover: #1f6be0;
+  --ui-accent-soft: #e6f0ff;
+  --ui-success: #22a06b;
+  --ui-success-hover: #1a8a5a;
+  --ui-warning: #f5a524;
+  --ui-warning-hover: #e39512;
+  --ui-danger: #e5484d;
+  --ui-gold: #d99a06;
+  --ui-pop: #3b82f6;
+  --ui-power: #f08c00;
+  --ui-happy: #22a06b;
+  --ui-neutral: #d99a06;
+  --ui-unhappy: #e5484d;
+  --ui-radius: 14px;
   --ui-gap: 8px;
 }
 
-/* NES.css ships a reboot with a white page; keep the game's dark ground while loading. */
 html,
 body {
-  background: var(--ui-ground);
+  background: var(--ui-sky);
 }
 
 /* The overlay never blocks the canvas except where an element opts in (buttons, panels). */
@@ -33,8 +43,8 @@ body {
   inset: 0;
   pointer-events: none;
   color: var(--ui-text);
-  font: 12px/1.5 var(--ui-font);
-  -webkit-font-smoothing: none;
+  font: 500 14px/1.4 var(--ui-font);
+  -webkit-font-smoothing: antialiased;
 }
 
 #ui [hidden] {
@@ -57,45 +67,125 @@ body {
 
 /* --- Icons ----------------------------------------------------------------------------- */
 
-/* pixelarticons use a 24-unit grid of 2-unit pixels, so 12px and 24px render crisply. */
 .icon {
   display: inline-flex;
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
 }
 
 .icon svg {
   width: 100%;
   height: 100%;
-  shape-rendering: crispEdges;
 }
 
 /* --- Buttons --------------------------------------------------------------------------- */
 
-#ui .nes-btn {
-  font-family: inherit;
-  font-size: 12px;
-}
-
-.ui-button {
+.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   min-height: 44px;
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 650;
+  color: var(--ui-text);
+  background: var(--ui-card-solid);
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  box-shadow: var(--ui-shadow);
+  cursor: pointer;
   touch-action: manipulation;
+  transition:
+    background-color 0.15s ease,
+    transform 0.08s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: #f3f6fa;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-primary {
+  color: #fff;
+  background: var(--ui-accent);
+  border-color: transparent;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--ui-accent-hover);
+}
+
+.btn-success {
+  color: #fff;
+  background: var(--ui-success);
+  border-color: transparent;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: var(--ui-success-hover);
+}
+
+.btn-warning {
+  color: #3a2800;
+  background: var(--ui-warning);
+  border-color: transparent;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: var(--ui-warning-hover);
+}
+
+.btn-icon {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: var(--ui-muted);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: rgba(31, 42, 58, 0.06);
 }
 
 .btn-cost {
-  padding: 0 4px;
-  color: #6b4a00;
-  background: rgba(247, 213, 29, 0.35);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a5a00;
+  background: rgba(217, 154, 6, 0.16);
+  border-radius: 999px;
 }
 
-.btn-cost.is-unaffordable {
+.btn-primary .btn-cost,
+.btn-success .btn-cost {
   color: #fff;
-  background: var(--ui-error);
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.btn-warning .btn-cost {
+  color: #3a2800;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.btn-cost.is-unaffordable,
+.btn-primary .btn-cost.is-unaffordable,
+.btn-success .btn-cost.is-unaffordable,
+.btn-warning .btn-cost.is-unaffordable {
+  color: #fff;
+  background: var(--ui-danger);
 }
 
 /* --- City layout ----------------------------------------------------------------------- */
@@ -125,14 +215,24 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
+/* Build tools sit together on one floating dock. */
 .build-bar {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 8px;
+  background: var(--ui-card);
+  border-radius: 18px;
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.build-bar .btn {
+  box-shadow: none;
 }
 
 /* --- HUD ------------------------------------------------------------------------------- */
@@ -140,24 +240,19 @@ body {
 .hud {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  /* Room for the pixel frame drawn with box-shadow outside each chip. */
-  padding: 3px;
+  gap: 8px;
 }
 
 .hud-resource {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px 4px 6px;
-  color: var(--ui-text);
-  background: var(--ui-panel-soft);
-  /* Pixel frame with notched corners, like NES.css's rounded containers. */
-  box-shadow:
-    0 -3px 0 0 var(--ui-frame),
-    0 3px 0 0 var(--ui-frame),
-    -3px 0 0 0 var(--ui-frame),
-    3px 0 0 0 var(--ui-frame);
+  padding: 7px 12px 7px 9px;
+  font-weight: 700;
+  background: var(--ui-card);
+  border-radius: 999px;
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: blur(10px);
 }
 
 .hud-resource[data-resource='gold'] .icon {
@@ -185,68 +280,84 @@ body {
 }
 
 .hud-value {
-  min-width: 4ch;
+  min-width: 3ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 /* --- Building panel -------------------------------------------------------------------- */
 
-#ui .panel {
-  margin: 0;
-  box-sizing: border-box;
-}
-
-/* Desktop: panel docks to the right side under the HUD. `#ui` outranks NES.css's
-   `.nes-container { position: relative }`. */
-#ui .building-panel {
-  position: absolute;
-  top: 84px;
-  right: max(12px, env(safe-area-inset-right));
-  width: 272px;
+.panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 14px 16px 16px;
+  background: var(--ui-card-solid);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow-strong);
 }
 
-#ui .building-panel.nes-container {
-  padding: 18px 14px 14px;
-}
-
-#ui .building-panel > .title {
-  margin: -30px 0 0;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.close-button {
+/* Desktop: the card docks to the right side under the HUD. */
+#ui .building-panel {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  min-height: 0;
-  padding: 0 2px;
+  top: 72px;
+  right: max(12px, env(safe-area-inset-right));
+  width: 280px;
 }
 
-.close-button .icon {
-  width: 12px;
-  height: 12px;
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.panel-level {
+.panel-badge {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  border-radius: 11px;
+}
+
+.panel-badge .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.panel-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.panel-subtitle {
+  font-size: 12px;
   color: var(--ui-muted);
 }
 
 .panel-text {
   margin: 0;
+  color: #3c4757;
 }
 
 .panel-stats {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   margin: 0;
-  padding: 0;
+  padding: 10px 12px;
   list-style: none;
+  background: #f6f8fb;
+  border-radius: 10px;
 }
 
 .panel-stats li {
@@ -256,8 +367,8 @@ body {
 }
 
 .panel-stats .icon {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
 }
 
 .stat-gold .icon {
@@ -278,28 +389,33 @@ body {
 
 .upgrade-button {
   width: 100%;
-  margin-top: 4px;
 }
 
 /* --- Hint & toast ---------------------------------------------------------------------- */
 
-#ui .hint.nes-container,
-#ui .toast.nes-container {
-  margin: 0;
+.hint {
   padding: 8px 14px;
+  font-size: 13px;
   text-align: center;
+  background: var(--ui-card);
+  border-radius: 999px;
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: blur(10px);
 }
 
 .toast {
   position: absolute;
-  top: 30%;
+  top: 76px;
   left: 50%;
-  transform: translateX(-50%);
   max-width: calc(100% - 48px);
-}
-
-#ui .toast.nes-container {
-  color: var(--ui-error);
+  padding: 10px 16px;
+  font-weight: 650;
+  text-align: center;
+  color: #fff;
+  background: rgba(31, 42, 58, 0.92);
+  border-radius: 999px;
+  box-shadow: var(--ui-shadow-strong);
+  transform: translateX(-50%);
 }
 
 /* --- Main menu ------------------------------------------------------------------------- */
@@ -313,67 +429,74 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   text-align: center;
+  background: linear-gradient(180deg, #cdeefa 0%, #a8d8ea 58%, #92c98a 100%);
+}
+
+.main-menu-logo {
+  width: 56px;
+  height: 56px;
+  padding: 14px;
+  color: var(--ui-accent);
+  background: var(--ui-card-solid);
+  border-radius: 20px;
+  box-shadow: var(--ui-shadow-strong);
 }
 
 .main-menu-title {
-  margin: 0;
-  font-size: 48px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--ui-text);
-  text-shadow: 4px 4px 0 #000;
+  margin: 6px 0 0;
+  font-size: clamp(32px, 7vw, 56px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #1f3350;
 }
 
 .main-menu-subtitle {
-  margin: 0 0 20px;
-  color: var(--ui-muted);
+  margin: 0 0 18px;
+  color: #3c5570;
 }
 
 .main-menu-buttons {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  width: min(240px, 100%);
+  gap: 12px;
+  width: min(260px, 100%);
 }
 
-.main-menu-buttons .nes-btn {
+.main-menu-buttons .btn {
   width: 100%;
 }
 
 /* --- Mobile ---------------------------------------------------------------------------- */
 
 @media (max-width: 600px) {
-  /* Panel joins the bottom bar's flow, directly above the (possibly wrapped) build bar.
-     Relative (not static) so the absolutely placed close button stays inside the panel. */
+  /* The card becomes a sheet in the bottom bar's flow, above the (possibly wrapped) dock.
+     Relative, not static, so the close button stays anchored inside it. */
   #ui .building-panel {
     position: relative;
     top: auto;
     right: auto;
     width: 100%;
+    border-radius: 18px;
   }
 
   .hud {
-    gap: 10px;
+    gap: 6px;
   }
 
   .hud-resource {
     gap: 4px;
-    padding: 2px 6px 2px 4px;
+    padding: 5px 9px 5px 7px;
+    font-size: 13px;
   }
 
   .hud .icon {
-    width: 12px;
-    height: 12px;
+    width: 15px;
+    height: 15px;
   }
 
-  .build-bar .icon {
-    width: 12px;
-    height: 12px;
-  }
-
-  .main-menu-title {
-    font-size: 24px;
+  .build-bar .btn {
+    padding: 0 10px;
   }
 }

@@ -29,7 +29,7 @@ export class BuildBar {
   update(activeTool: BuildingType | null, gold: number): void {
     for (const [type, { node, cost }] of this.buttons) {
       const active = type === activeTool;
-      node.classList.toggle('is-primary', active);
+      node.classList.toggle('btn-primary', active);
       node.setAttribute('aria-pressed', String(active));
       cost.classList.toggle('is-unaffordable', gold < BUILDINGS[type].buildCost);
     }

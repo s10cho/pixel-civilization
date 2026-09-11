@@ -4,7 +4,7 @@ import { BUILDINGS } from '../config/balance';
 import type { Resources } from '../simulation/gameState';
 import { BuildBar } from './BuildBar';
 import { BuildingPanel } from './BuildingPanel';
-import { button, el, setDisabled, setText } from './dom';
+import { button, el, setText } from './dom';
 import { formatAmount } from './format';
 import { Hud } from './Hud';
 import { Toast } from './Toast';
@@ -36,7 +36,7 @@ export class CityUI {
   private readonly expandLabel: HTMLElement;
   private readonly expandCost = el('span', 'btn-cost');
   private readonly buildingPanel: BuildingPanel;
-  private readonly hint = el('div', 'nes-container is-dark is-rounded hint');
+  private readonly hint = el('div', 'hint');
   private readonly toast = new Toast();
 
   constructor(root: HTMLElement, handlers: CityUIHandlers) {
@@ -81,13 +81,13 @@ export class CityUI {
     if (view.expansionCost === null) {
       setText(this.expandLabel, 'Max territory');
       this.expandCost.hidden = true;
-      setDisabled(this.expandButton, true);
+      this.expandButton.disabled = true;
     } else {
       setText(this.expandLabel, 'Expand');
       setText(this.expandCost, `${formatAmount(view.expansionCost)}g`);
       this.expandCost.hidden = false;
       this.expandCost.classList.toggle('is-unaffordable', gold < view.expansionCost);
-      setDisabled(this.expandButton, false);
+      this.expandButton.disabled = false;
     }
 
     this.hint.hidden = view.activeTool === null;

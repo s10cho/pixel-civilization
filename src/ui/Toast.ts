@@ -3,7 +3,7 @@ import { el } from './dom';
 
 /** Short-lived feedback message (e.g. why an action was rejected). */
 export class Toast {
-  readonly element = el('div', 'nes-container is-dark is-rounded toast');
+  readonly element = el('div', 'toast');
   private timer: number | undefined;
 
   constructor() {

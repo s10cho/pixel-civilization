@@ -13,7 +13,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-export type ButtonVariant = 'primary' | 'success' | 'warning' | 'error';
+export type ButtonVariant = 'primary' | 'success' | 'warning';
 
 export interface ButtonOptions {
   label?: string;
@@ -26,10 +26,10 @@ export interface ButtonOptions {
   onClick?: () => void;
 }
 
-/** NES.css-styled button with an optional pixel icon. The label text lives in `.btn-label`. */
+/** Rounded button with an optional icon. The label text lives in `.btn-label`. */
 export function button(options: ButtonOptions): HTMLButtonElement {
-  const classes = ['nes-btn', 'ui-button'];
-  if (options.variant) classes.push(`is-${options.variant}`);
+  const classes = ['btn'];
+  if (options.variant) classes.push(`btn-${options.variant}`);
   if (options.className) classes.push(options.className);
 
   const node = el('button', classes.join(' '));
@@ -38,14 +38,8 @@ export function button(options: ButtonOptions): HTMLButtonElement {
   if (options.label !== undefined) node.append(el('span', 'btn-label', options.label));
   if (options.ariaLabel) node.setAttribute('aria-label', options.ariaLabel);
   if (options.onClick) node.addEventListener('click', options.onClick);
-  setDisabled(node, options.disabled ?? false);
+  node.disabled = options.disabled ?? false;
   return node;
-}
-
-/** Disables a button both functionally and visually (NES.css `is-disabled`). */
-export function setDisabled(node: HTMLButtonElement, disabled: boolean): void {
-  node.disabled = disabled;
-  node.classList.toggle('is-disabled', disabled);
 }
 
 /** Updates text only when it changed, so per-tick UI refreshes don't touch the DOM needlessly. */

@@ -1,15 +1,36 @@
-import * as Phaser from 'phaser';
-import 'nes.css/css/nes-core.min.css';
-import { createPhaserConfig } from './config/phaserConfig';
-import { loadUiFonts } from './ui/fonts';
+import { CityScreen } from './screens/CityScreen';
+import { MenuScreen } from './screens/MenuScreen';
+import type { Screen } from './screens/Screen';
+import { getUiRoot } from './ui/dom';
 import './ui/ui.css';
 
-// Fonts first, so Phaser canvas text and the DOM UI render with the pixel font from frame one.
-await loadUiFonts();
+const viewRoot = document.getElementById('game');
+if (!viewRoot) throw new Error('Missing #game view root in index.html');
+const uiRoot = getUiRoot();
 
-const game = new Phaser.Game(createPhaserConfig('game'));
+let current: Screen | null = null;
 
-// Expose the game instance in development for browser-side debugging and verification.
+function show(next: Screen): void {
+  current?.unmount();
+  current = next;
+  next.mount();
+}
+
+function showMenu(): void {
+  show(new MenuScreen(uiRoot, { onNewGame: showCity }));
+}
+
+function showCity(): void {
+  show(new CityScreen(viewRoot!, uiRoot, { onExit: showMenu }));
+}
+
+showMenu();
+
+// Expose the active screen in development for browser-side debugging and verification.
 if (import.meta.env.DEV) {
-  (window as unknown as { __PIXEL_CIV__: Phaser.Game }).__PIXEL_CIV__ = game;
+  (window as unknown as { __PIXEL_CIV__: object }).__PIXEL_CIV__ = {
+    get screen() {
+      return current;
+    },
+  };
 }

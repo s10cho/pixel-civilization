@@ -11,10 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "galmuri": "^2.40.3",
-    "nes.css": "^2.3.0",
-    "phaser": "^4.2.1",
-    "pixelarticons": "^2.4.1",
+    "lucide-static": "^1.45.0",
     "three": "^0.186.0"
   },
   "devDependencies": {
