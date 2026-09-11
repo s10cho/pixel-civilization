@@ -1,19 +1,24 @@
+import { audio } from '../audio/AudioEngine';
 import { BUILDABLE_TYPES, buildingName, getBuildCost, getUnlockState } from '../building/rules';
 import type { Building, BuildingType } from '../building/types';
 import { getOccupancy } from '../citizen/occupancy';
 import { BUILDINGS, ERA_SETTINGS } from '../config/balance';
-import { CAMERA, SIMULATION } from '../config/gameConfig';
+import { CAMERA, ERA_TRANSITION, SIMULATION } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
 import { detectProblems, type CityProblem, type ProblemKind } from '../economy/problems';
+import type { EraId } from '../progression/era';
+import { advanceEra, getEraProgress, type EraProgress } from '../progression/eraProgress';
 import { isMaxLevel, unlocksAtLevel, xpToNextLevel } from '../progression/level';
 import { getResearchStatus, hasResearchBuilding, startResearch } from '../progression/research';
 import { BuildingView } from '../render3d/BuildingView';
 import { CameraRig } from '../render3d/CameraRig';
 import { CitizenView } from '../render3d/CitizenView';
 import type { TileCoord } from '../render3d/coords';
+import { DecorView } from '../render3d/DecorView';
 import { GroundView } from '../render3d/GroundView';
 import { getQualityPreset } from '../render3d/quality';
+import { SmokeView } from '../render3d/SmokeView';
 import { Stage } from '../render3d/Stage';
 import { TileMarkers } from '../render3d/TileMarkers';
 import { TilePicker } from '../render3d/TilePicker';
@@ -28,9 +33,16 @@ import {
 import { createInitialState, type GameState } from '../simulation/gameState';
 import { tickSimulation } from '../simulation/tick';
 import type { BuildOption } from '../ui/BuildBar';
-import type { CityInfo } from '../ui/BuildingPanel';
+import type { CityInfo, EraInfo } from '../ui/BuildingPanel';
 import { CityUI } from '../ui/CityUI';
-import { ACTION_ERROR_MESSAGES, problemText, RESEARCH_ERROR_MESSAGES } from '../ui/messages';
+import {
+  ACTION_ERROR_MESSAGES,
+  ERA_ERROR_MESSAGES,
+  ERA_TAGLINES,
+  eraRequirementText,
+  problemText,
+  RESEARCH_ERROR_MESSAGES,
+} from '../ui/messages';
 import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
 import { getBuildingAt } from '../world/placement';
 import { getExpansionCost, getUnlockedArea } from '../world/territory';
@@ -53,6 +65,17 @@ interface Press {
   longPressTimer: number | undefined;
 }
 
+/** A running era change: the environment turns, then buildings transform one by one. */
+interface EraTransition {
+  startSeconds: number;
+  environmentDone: boolean;
+  /** Building ids in transformation order (outward from the Town Hall). */
+  order: number[];
+  /** Index of the next building to transform. */
+  next: number;
+  staggerSeconds: number;
+}
+
 /** How long newly unlocked build tools pulse, in ms. */
 const NEW_UNLOCK_HIGHLIGHT_MS = 10_000;
 
@@ -70,6 +93,8 @@ export class CityScreen implements Screen {
   private rig!: CameraRig;
   private ground!: GroundView;
   private buildings!: BuildingView;
+  private decor!: DecorView;
+  private smoke!: SmokeView;
   private citizens!: CitizenView;
   private markers!: TileMarkers;
   private picker!: TilePicker;
@@ -84,6 +109,14 @@ export class CityScreen implements Screen {
   private seenResearchCount = 0;
   private newUnlocks = new Set<BuildingType>();
   private newUnlocksUntil = 0;
+  /** Whether "ready for the next era" was already announced for the current era. */
+  private announcedEraReady = false;
+  /** The era the environment currently shows (lags state.era during a transition). */
+  private displayEra: EraId = this.state.era;
+  /** Buildings still showing an older era's model during a transition. */
+  private readonly eraOverrides = new Map<number, EraId>();
+  private transition: EraTransition | null = null;
+  private readonly eraOf = (building: Building): EraId => this.eraOverrides.get(building.id) ?? this.state.era;
 
   private activeTool: BuildingType | null = null;
   private movingBuildingId: number | null = null;
@@ -108,11 +141,14 @@ export class CityScreen implements Screen {
     this.stage = new Stage(this.viewRoot, quality);
     this.ground = new GroundView(this.stage.scene);
     this.buildings = new BuildingView(this.stage.scene);
+    this.decor = new DecorView(this.stage.scene);
+    this.smoke = new SmokeView(this.stage.scene, quality.smokePuffs);
     this.citizens = new CitizenView(this.stage.scene, quality.renderedCitizens);
     this.markers = new TileMarkers(this.stage.scene);
-    this.ground.syncTerritory(this.state);
-    this.buildings.sync(this.state.buildings);
+    this.applyEnvironment(this.state.era);
+    this.syncBuildings();
     this.citizens.sync(this.state.citizens);
+    audio.playMusic(this.state.era);
 
     this.rig = new CameraRig(this.stage.camera, this.stage.canvas);
     this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
@@ -127,6 +163,8 @@ export class CityScreen implements Screen {
       onFocusProblem: (kind) => this.focusProblem(kind),
       onToggleResearch: () => this.toggleResearch(),
       onStartResearch: (id) => this.beginResearch(id),
+      onAdvanceEra: () => this.advance(),
+      onShowEra: () => this.showTownHall(),
       onOpenMenu: () => this.handlers.onExit(),
     });
     this.seenLevel = this.state.cityLevel;
@@ -157,12 +195,13 @@ export class CityScreen implements Screen {
     this.markers.dispose();
     this.ground.dispose();
     this.buildings.dispose();
+    this.decor.dispose();
+    this.smoke.dispose();
     this.citizens.dispose();
     this.ui.destroy();
     // Removing the canvas also drops its pointer listeners.
     this.stage.dispose();
   }
-
   private readonly frame = (now: number): void => {
     // rAF timestamps can precede the performance.now() taken at mount, so never step backwards.
     const dt = Math.min(Math.max(0, (now - this.lastFrame) / 1000), SIMULATION.maxCatchUpSeconds);
@@ -184,8 +223,10 @@ export class CityScreen implements Screen {
     }
 
     const seconds = now / 1000;
+    this.updateTransition(seconds);
     this.citizens.render(this.accumulator / SIMULATION.tickSeconds, seconds);
     this.buildings.animate(seconds);
+    this.smoke.animate(seconds);
     this.rig.update();
     this.stage.render();
   };
@@ -332,8 +373,11 @@ export class CityScreen implements Screen {
     if (this.activeTool) {
       if (!tile) return;
       const result = placeBuilding(this.state, this.activeTool, tile.col, tile.row);
-      if (result.ok) this.onCityChanged();
-      else this.ui.showMessage(ACTION_ERROR_MESSAGES[result.error]);
+      if (result.ok) {
+        this.onCityChanged();
+        this.popBuilding(getBuildingAt(this.state, tile.col, tile.row)?.id);
+        audio.play('place');
+      } else this.fail(ACTION_ERROR_MESSAGES[result.error]);
       this.hoverTile = tile;
       this.updatePreview();
       this.refreshUI();
@@ -369,17 +413,30 @@ export class CityScreen implements Screen {
       this.selectedTile = tile;
       this.markers.setSelection(tile);
       this.onCityChanged();
+      this.popBuilding(buildingId);
+      audio.play('move');
     } else {
-      this.ui.showMessage(ACTION_ERROR_MESSAGES[result.error]);
+      this.fail(ACTION_ERROR_MESSAGES[result.error]);
       if (!keepModeOnFailure) this.movingBuildingId = null;
     }
     this.updatePreview();
     this.refreshUI();
   }
 
+  /** A rejected action: say why, with the error sound. */
+  private fail(message: string): void {
+    audio.play('error');
+    this.ui.showMessage(message);
+  }
+
+  /** Plays the "pop" on a building that just appeared or changed. */
+  private popBuilding(buildingId: number | undefined): void {
+    if (buildingId !== undefined) this.buildings.pop(buildingId, performance.now() / 1000);
+  }
+
   /** After the player changes the city: redraw and re-evaluate effects immediately. */
   private onCityChanged(): void {
-    this.buildings.sync(this.state.buildings);
+    this.syncBuildings();
     this.recomputeReport();
     this.updateProblems(true);
     this.announceProgress();
@@ -407,6 +464,7 @@ export class CityScreen implements Screen {
       const latest = completed[completed.length - 1];
       this.seenResearchCount = completed.length;
       this.ui.showMessage(`Research complete: ${RESEARCH[latest].name}`);
+      audio.play('research');
       // Its bonuses apply now, not on the next tick.
       this.recomputeReport();
     }
@@ -417,6 +475,7 @@ export class CityScreen implements Screen {
         unlocked.push(...unlocksAtLevel(level).filter((type) => getUnlockState(type, this.state) === 'available'));
       }
       this.seenLevel = this.state.cityLevel;
+      audio.play('levelUp');
       const names = unlocked.map((type) => buildingName(type, this.state.era));
       this.ui.showMessage(
         `City level ${this.state.cityLevel}!${names.length ? ` New: ${names.join(', ')}` : ''}`,
@@ -426,6 +485,102 @@ export class CityScreen implements Screen {
         this.newUnlocksUntil = performance.now() + NEW_UNLOCK_HIGHLIGHT_MS;
       }
     }
+
+    const progress = getEraProgress(this.state);
+    if (progress?.ready && !this.announcedEraReady) {
+      this.announcedEraReady = true;
+      this.ui.showMessage(
+        `Ready for the ${ERA_SETTINGS[progress.next].name} Era! Visit the ${buildingName('townHall', this.state.era)}.`,
+      );
+    }
+  }
+
+  /** The player's decision to enter the next era: starts the transformation sequence. */
+  private advance(): void {
+    const from = this.state.era;
+    const result = advanceEra(this.state);
+    if (!result.ok) {
+      this.fail(ERA_ERROR_MESSAGES[result.error]);
+      return;
+    }
+    audio.play('era');
+    audio.playMusic(result.era);
+    this.announcedEraReady = false;
+    this.seenLevel = this.state.cityLevel;
+    this.selectedTile = null;
+    this.activeTool = null;
+    this.movingBuildingId = null;
+    this.researchOpen = false;
+    this.markers.setSelection(null);
+    this.updatePreview();
+
+    // Every building keeps its old look until its turn, outward from the Town Hall.
+    const hall = this.state.buildings.find((b) => b.type === 'townHall');
+    const order = [...this.state.buildings]
+      .sort((a, b) => distance(a, hall) - distance(b, hall))
+      .map((building) => building.id);
+    for (const id of order) this.eraOverrides.set(id, from);
+    this.transition = {
+      startSeconds: performance.now() / 1000,
+      environmentDone: false,
+      order,
+      next: 0,
+      staggerSeconds: Math.min(
+        ERA_TRANSITION.staggerSeconds,
+        ERA_TRANSITION.maxSpreadSeconds / Math.max(1, order.length - 1),
+      ),
+    };
+    this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
+    this.ui.playEraTransition(`${ERA_SETTINGS[result.era].name} Era`, ERA_TAGLINES[result.era]);
+    this.onCityChanged();
+    this.refreshUI();
+  }
+
+  /** Steps the era change sequence; runs every frame. */
+  private updateTransition(seconds: number): void {
+    const transition = this.transition;
+    if (!transition) return;
+    const elapsed = seconds - transition.startSeconds;
+    if (!transition.environmentDone && elapsed >= ERA_TRANSITION.environmentAtSeconds) {
+      transition.environmentDone = true;
+      this.applyEnvironment(this.state.era);
+    }
+    let changed = false;
+    while (
+      transition.next < transition.order.length &&
+      elapsed >= ERA_TRANSITION.buildingsStartSeconds + transition.next * transition.staggerSeconds
+    ) {
+      const id = transition.order[transition.next++];
+      this.eraOverrides.delete(id);
+      this.buildings.pop(id, seconds);
+      changed = true;
+    }
+    if (changed) this.syncBuildings();
+    if (transition.environmentDone && transition.next >= transition.order.length) {
+      this.transition = null;
+      this.eraOverrides.clear();
+    }
+  }
+
+  /** Sky, light, ground, scenery and clothing for an era. */
+  private applyEnvironment(era: EraId): void {
+    this.displayEra = era;
+    this.stage.applyEra(era);
+    this.ground.sync(this.state, era);
+    this.decor.sync(this.state, era);
+    this.citizens.setEra(era);
+  }
+
+  private syncBuildings(): void {
+    this.buildings.sync(this.state.buildings, this.eraOf);
+    this.smoke.sync(this.state.buildings, this.eraOf);
+  }
+
+  private showTownHall(): void {
+    const hall = this.state.buildings.find((b) => b.type === 'townHall');
+    if (!hall) return;
+    this.rig.focusTile(hall.col, hall.row);
+    this.select({ col: hall.col, row: hall.row });
   }
 
   /** Auto focus: show where a city problem is. */
@@ -447,7 +602,8 @@ export class CityScreen implements Screen {
 
   private beginResearch(id: ResearchId): void {
     const result = startResearch(this.state, id);
-    if (!result.ok) this.ui.showMessage(RESEARCH_ERROR_MESSAGES[result.error]);
+    if (result.ok) audio.play('select');
+    else this.fail(RESEARCH_ERROR_MESSAGES[result.error]);
     this.refreshUI();
   }
 
@@ -455,13 +611,13 @@ export class CityScreen implements Screen {
     const tile = this.hoverTile;
     if (tile && this.activeTool) {
       const valid = validatePlacement(this.state, this.activeTool, tile.col, tile.row) === null;
-      this.markers.showPreview(this.activeTool, 1, tile, valid);
+      this.markers.showPreview(this.activeTool, 1, this.state.era, tile, valid);
       return;
     }
     const moving = this.movingBuilding();
     if (tile && moving) {
       const valid = validateMove(this.state, moving.id, tile.col, tile.row) === null;
-      this.markers.showPreview(moving.type, moving.level, tile, valid);
+      this.markers.showPreview(moving.type, moving.level, this.state.era, tile, valid);
       return;
     }
     this.markers.hidePreview();
@@ -505,20 +661,25 @@ export class CityScreen implements Screen {
 
   private upgrade(buildingId: number): void {
     const result = upgradeBuilding(this.state, buildingId);
-    if (result.ok) this.onCityChanged();
-    else this.ui.showMessage(ACTION_ERROR_MESSAGES[result.error]);
+    if (result.ok) {
+      this.onCityChanged();
+      this.popBuilding(buildingId);
+      audio.play('upgrade');
+    } else this.fail(ACTION_ERROR_MESSAGES[result.error]);
     this.refreshUI();
   }
 
   private expand(): void {
     const result = expandTerritory(this.state);
     if (result.ok) {
-      this.ground.syncTerritory(this.state);
+      this.ground.sync(this.state, this.displayEra);
+      this.decor.sync(this.state, this.displayEra);
+      audio.play('expand');
       // Auto focus: frame the newly unlocked territory.
       this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
       this.announceProgress();
     } else {
-      this.ui.showMessage(ACTION_ERROR_MESSAGES[result.error]);
+      this.fail(ACTION_ERROR_MESSAGES[result.error]);
     }
     this.refreshUI();
   }
@@ -545,7 +706,7 @@ export class CityScreen implements Screen {
     }));
   }
 
-  private cityInfo(): CityInfo {
+  private cityInfo(progress: EraProgress | null): CityInfo {
     const level = this.state.cityLevel;
     return {
       level,
@@ -554,6 +715,19 @@ export class CityScreen implements Screen {
       nextUnlocks: unlocksAtLevel(level + 1)
         .filter((type) => getUnlockState(type, { ...this.state, cityLevel: level + 1 }) === 'available')
         .map((type) => buildingName(type, this.state.era)),
+      era: this.eraInfo(progress),
+    };
+  }
+
+  private eraInfo(progress: EraProgress | null): EraInfo {
+    return {
+      current: ERA_SETTINGS[this.state.era].name,
+      next: progress ? ERA_SETTINGS[progress.next].name : null,
+      requirements: (progress?.requirements ?? []).map((requirement) => ({
+        met: requirement.met,
+        text: eraRequirementText(requirement),
+      })),
+      ready: progress?.ready ?? false,
     };
   }
 
@@ -602,6 +776,7 @@ export class CityScreen implements Screen {
       ? (getBuildingAt(this.state, this.selectedTile.col, this.selectedTile.row) ?? null)
       : null;
     const active = this.state.research.active;
+    const eraProgress = getEraProgress(this.state);
     this.ui.update({
       resources: this.state.resources,
       era: this.state.era,
@@ -610,13 +785,18 @@ export class CityScreen implements Screen {
       selectedBuilding,
       selectedOccupancy: selectedBuilding ? getOccupancy(this.state, selectedBuilding) : null,
       selectedReport: selectedBuilding ? (this.report.buildings.get(selectedBuilding.id) ?? null) : null,
-      city: selectedBuilding?.type === 'townHall' ? this.cityInfo() : null,
+      city: selectedBuilding?.type === 'townHall' ? this.cityInfo(eraProgress) : null,
       movingBuildingId: this.movingBuildingId,
       problems: this.problems,
       research: this.researchView(),
       researchProgress: active ? active.progress / RESEARCH[active.id].points : null,
+      eraReady: eraProgress?.ready ? ERA_SETTINGS[eraProgress.next].name : null,
       expansionCost: getExpansionCost(this.state.expansionLevel),
       hint: this.hintText(),
     });
   }
+}
+
+function distance(building: Building, from: Building | undefined): number {
+  return from ? Math.hypot(building.col - from.col, building.row - from.row) : 0;
 }

@@ -1,6 +1,9 @@
 import type { BuildingType } from '../building/types';
 import type { BuildingEffect } from '../economy/cityReport';
 import type { CityProblem } from '../economy/problems';
+import { RESEARCH } from '../config/research';
+import type { EraId } from '../progression/era';
+import type { EraError, EraRequirement } from '../progression/eraProgress';
 import type { ResearchError } from '../progression/research';
 import type { ActionError } from '../simulation/actions';
 
@@ -25,6 +28,11 @@ export const BUILDING_DESCRIPTIONS: Record<BuildingType, string> = {
   powerPlant: 'Generates power for shops and industry.',
   researchCenter: 'Researches new technology. More and bigger ones research faster.',
   factory: 'Earns a lot of gold, but pollutes homes nearby.',
+};
+
+export const ERA_ERROR_MESSAGES: Record<EraError, string> = {
+  finalEra: 'This is the latest era for now',
+  requirementsNotMet: 'The city is not ready for the next era yet',
 };
 
 export const RESEARCH_ERROR_MESSAGES: Record<ResearchError, string> = {
@@ -53,6 +61,17 @@ export function effectText(effect: BuildingEffect): string {
   }
 }
 
+export function eraRequirementText(requirement: EraRequirement): string {
+  switch (requirement.kind) {
+    case 'population':
+      return `Population ${requirement.current} / ${requirement.target}`;
+    case 'cityLevel':
+      return `City level ${requirement.current} / ${requirement.target}`;
+    case 'research':
+      return `Research ${requirement.researchId ? RESEARCH[requirement.researchId].name : ''}`;
+  }
+}
+
 export function problemText(problem: CityProblem): string {
   switch (problem.kind) {
     case 'powerShortage':
@@ -63,3 +82,10 @@ export function problemText(problem: CityProblem): string {
       return `Pollution is hurting ${problem.amount} ${problem.amount === 1 ? 'home' : 'homes'}`;
   }
 }
+
+/** One line under the new-era banner. */
+export const ERA_TAGLINES: Record<EraId, string> = {
+  ancient: 'Huts, groves and windmills: a people settles down.',
+  medieval: 'Stone walls, markets and watermills reshape the town.',
+  industrial: 'Steam and steel power a roaring new city.',
+};

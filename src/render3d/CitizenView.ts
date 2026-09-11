@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { isCitizenOutside } from '../citizen/behavior';
 import type { Citizen } from '../citizen/types';
 import { CITIZENS } from '../config/balance';
-import { CITIZEN_3D, SCENE_3D } from '../config/gameConfig';
+import { CITIZEN_3D, ERA_LOOK, SCENE_3D } from '../config/gameConfig';
 import { getMood, type Mood } from '../economy/happiness';
+import type { EraId } from '../progression/era';
 import { simToWorld } from './coords';
 import { getCitizenGeometries } from './models';
 
@@ -16,8 +17,8 @@ interface Track {
   heading: number;
   visible: boolean;
   mood: Mood;
-  shirt: THREE.Color;
   phase: number;
+  id: number;
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -32,7 +33,7 @@ export class CitizenView {
   private readonly shirts: THREE.InstancedMesh;
   private readonly moods: THREE.InstancedMesh;
   private readonly tracks = new Map<number, Track>();
-  private readonly shirtColors = CITIZEN_3D.shirtColors.map((hex) => new THREE.Color(hex));
+  private shirtColors: THREE.Color[] = ERA_LOOK.ancient.shirts.map((hex) => new THREE.Color(hex));
   private readonly moodColors: Record<Exclude<Mood, 'neutral'>, THREE.Color> = {
     happy: new THREE.Color(CITIZEN_3D.moodHappy),
     unhappy: new THREE.Color(CITIZEN_3D.moodUnhappy),
@@ -56,6 +57,11 @@ export class CitizenView {
     this.moods.castShadow = false;
   }
 
+  /** Citizens dress for the era. */
+  setEra(era: EraId): void {
+    this.shirtColors = ERA_LOOK[era].shirts.map((hex) => new THREE.Color(hex));
+  }
+
   /** Call after each simulation tick. */
   sync(citizens: readonly Citizen[]): void {
     const alive = new Set<number>();
@@ -73,8 +79,8 @@ export class CitizenView {
           heading: 0,
           visible,
           mood: 'neutral',
-          shirt: this.shirtColors[citizen.id % this.shirtColors.length],
           phase: citizen.id * 1.7,
+          id: citizen.id,
         };
         this.tracks.set(citizen.id, track);
       } else if (visible && !track.visible) {
@@ -116,7 +122,7 @@ export class CitizenView {
       this.matrix.compose(this.position, this.rotation, this.scale);
       this.body.setMatrixAt(drawn, this.matrix);
       this.shirts.setMatrixAt(drawn, this.matrix);
-      this.shirts.setColorAt(drawn, track.shirt);
+      this.shirts.setColorAt(drawn, this.shirtColors[track.id % this.shirtColors.length]);
       drawn++;
 
       if (track.mood !== 'neutral') {

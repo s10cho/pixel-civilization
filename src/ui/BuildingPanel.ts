@@ -12,7 +12,17 @@ import { BUILDING_DESCRIPTIONS, effectText } from './messages';
 export interface BuildingPanelHandlers {
   onUpgrade(buildingId: number): void;
   onMove(buildingId: number): void;
+  onAdvanceEra(): void;
   onClose(): void;
+}
+
+/** Era status: requirements for the next one and whether the city may advance. */
+export interface EraInfo {
+  current: string;
+  /** Name of the next era, or null in the final era. */
+  next: string | null;
+  requirements: { text: string; met: boolean }[];
+  ready: boolean;
 }
 
 /** City status shown on the Town Hall's card. */
@@ -23,6 +33,7 @@ export interface CityInfo {
   xpToNext: number | null;
   /** Names of buildings the next level unlocks. */
   nextUnlocks: string[];
+  era: EraInfo;
 }
 
 export interface BuildingPanelView {
@@ -75,6 +86,13 @@ export class BuildingPanel {
   private readonly cityXp = el('span', 'panel-city-xp');
   private readonly cityXpFill = el('div', 'progress-fill is-xp');
   private readonly cityNote = el('div', 'panel-city-note');
+  private readonly era = el('div', 'panel-era');
+  private readonly eraTitle = el('strong');
+  private readonly eraNext = el('div', 'panel-city-note');
+  private readonly eraRequirements = el('ul', 'era-requirements');
+  private readonly advanceButton: HTMLButtonElement;
+  private readonly advanceLabel: HTMLElement;
+  private renderedRequirements = '';
   private readonly effects = el('ul', 'panel-effects');
   private readonly actions = el('div', 'panel-actions');
   private readonly upgradeButton: HTMLButtonElement;
@@ -123,7 +141,16 @@ export class BuildingPanel {
     cityTitle.append(this.cityLevel, this.cityXp);
     const xpTrack = el('div', 'progress');
     xpTrack.append(this.cityXpFill);
-    this.city.append(cityTitle, xpTrack, this.cityNote);
+    this.advanceButton = button({
+      icon: 'sparkles',
+      label: 'Advance',
+      variant: 'primary',
+      className: 'advance-era-button',
+      onClick: handlers.onAdvanceEra,
+    });
+    this.advanceLabel = this.advanceButton.querySelector('.btn-label')!;
+    this.era.append(this.eraTitle, this.eraNext, this.eraRequirements, this.advanceButton);
+    this.city.append(cityTitle, xpTrack, this.cityNote, this.era);
 
     this.element.append(header, this.description, this.city, this.statList, this.effects, this.actions);
     this.element.hidden = true;
@@ -153,6 +180,7 @@ export class BuildingPanel {
       this.cityXpFill.style.width = xpToNext === null ? '100%' : `${Math.min(100, (xp / xpToNext) * 100)}%`;
       this.cityNote.hidden = nextUnlocks.length === 0;
       setText(this.cityNote, `Next level unlocks: ${nextUnlocks.join(', ')}`);
+      this.updateEra(view.city.era);
     }
 
     const gold = report?.goldPerSecond ?? output.goldPerSecond;
@@ -208,5 +236,28 @@ export class BuildingPanel {
     this.moveButton.classList.toggle('btn-primary', view.moving);
     setText(this.moveLabel, view.moving ? 'Cancel move' : 'Move');
     this.actions.hidden = this.upgradeButton.hidden && this.moveButton.hidden;
+  }
+
+  private updateEra(era: EraInfo): void {
+    setText(this.eraTitle, `${era.current} Era`);
+    this.eraNext.hidden = false;
+    setText(
+      this.eraNext,
+      era.next ? `To enter the ${era.next} Era:` : 'Your civilization has reached the latest era.',
+    );
+    const signature = era.requirements.map((r) => `${r.met}:${r.text}`).join('|');
+    if (signature !== this.renderedRequirements) {
+      this.renderedRequirements = signature;
+      this.eraRequirements.replaceChildren(
+        ...era.requirements.map((requirement) => {
+          const item = el('li', requirement.met ? 'is-met' : undefined, requirement.text);
+          return item;
+        }),
+      );
+    }
+    this.eraRequirements.hidden = era.requirements.length === 0;
+    this.advanceButton.hidden = era.next === null;
+    this.advanceButton.disabled = !era.ready;
+    if (era.next) setText(this.advanceLabel, `Enter the ${era.next} Era`);
   }
 }

@@ -23,6 +23,15 @@ export const ERA_SETTINGS: Record<
   industrial: { name: 'Industrial', costMultiplier: 2.5, outputMultiplier: 3, powerDemandMultiplier: 2.5 },
 };
 
+/**
+ * What a city needs to enter each later era (design brief §10): population and city level
+ * here, plus the research whose `opensEra` names the era.
+ */
+export const ERA_REQUIREMENTS: Record<Exclude<EraId, 'ancient'>, { population: number; cityLevel: number }> = {
+  medieval: { population: 50, cityLevel: 5 },
+  industrial: { population: 150, cityLevel: 8 },
+};
+
 export const POWER = {
   /** Output share a power-hungry building keeps with no power at all. */
   minEfficiency: 0.4,
@@ -100,6 +109,7 @@ export const PROGRESSION = {
     upgradePerLevel: 8,
     expand: 40,
     research: 30,
+    era: 100,
     /** For each new highest whole population. */
     citizen: 1,
   },

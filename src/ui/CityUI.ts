@@ -1,5 +1,6 @@
 import type { Building, BuildingType } from '../building/types';
 import type { Occupancy } from '../citizen/occupancy';
+import { ERA_TRANSITION } from '../config/gameConfig';
 import type { ResearchId } from '../config/research';
 import type { BuildingReport } from '../economy/cityReport';
 import type { CityProblem, ProblemKind } from '../economy/problems';
@@ -23,6 +24,9 @@ export interface CityUIHandlers {
   onFocusProblem(kind: ProblemKind): void;
   onToggleResearch(): void;
   onStartResearch(id: ResearchId): void;
+  onAdvanceEra(): void;
+  /** Show the Town Hall, where the era can be advanced. */
+  onShowEra(): void;
   onOpenMenu(): void;
 }
 
@@ -43,6 +47,8 @@ export interface CityUIView {
   research: ResearchPanelView;
   /** Progress (0..1) of the running research, for the button badge; null when idle. */
   researchProgress: number | null;
+  /** Name of the next era once every requirement is met, else null. */
+  eraReady: string | null;
   /** Cost of the next territory expansion, or null when fully expanded. */
   expansionCost: number | null;
   /** Short instruction shown above the build dock, or null. */
@@ -54,6 +60,8 @@ export class CityUI {
   private readonly container = el('div', 'city-ui');
   private readonly hud = new Hud();
   private readonly problems: ProblemsBar;
+  private readonly eraChip: HTMLButtonElement;
+  private readonly eraChipLabel: HTMLElement;
   private readonly researchPanel: ResearchPanel;
   private readonly researchButton: HTMLButtonElement;
   private readonly researchBadge = el('span', 'btn-badge');
@@ -64,6 +72,10 @@ export class CityUI {
   private readonly buildingPanel: BuildingPanel;
   private readonly hint = el('div', 'hint');
   private readonly toast = new Toast();
+  private readonly eraBannerTitle = el('div', 'era-banner-title');
+  private readonly eraBannerSubtitle = el('div', 'era-banner-subtitle');
+  private readonly eraOverlay = this.createEraOverlay();
+  private eraTimer: number | undefined;
 
   constructor(root: HTMLElement, handlers: CityUIHandlers) {
     this.problems = new ProblemsBar(handlers.onFocusProblem);
@@ -73,8 +85,10 @@ export class CityUI {
     });
     // On desktop the research panel stacks under the HUD and problems; on mobile CSS turns it
     // into a bottom sheet.
+    this.eraChip = button({ icon: 'sparkles', label: '', className: 'era-chip', onClick: handlers.onShowEra });
+    this.eraChipLabel = this.eraChip.querySelector('.btn-label')!;
     const topLeft = el('div', 'top-left');
-    topLeft.append(this.hud.element, this.problems.element, this.researchPanel.element);
+    topLeft.append(this.hud.element, this.eraChip, this.problems.element, this.researchPanel.element);
 
     this.researchButton = button({
       icon: 'flask',
@@ -94,6 +108,7 @@ export class CityUI {
     this.buildingPanel = new BuildingPanel({
       onUpgrade: handlers.onUpgrade,
       onMove: handlers.onMoveBuilding,
+      onAdvanceEra: handlers.onAdvanceEra,
       onClose: handlers.onCloseBuildingPanel,
     });
 
@@ -114,13 +129,15 @@ export class CityUI {
     const bottomBar = el('div', 'bottom-bar');
     bottomBar.append(this.buildingPanel.element, this.hint, this.buildBar.element);
 
-    this.container.append(topBar, this.toast.element, bottomBar);
+    this.container.append(topBar, this.toast.element, bottomBar, this.eraOverlay);
     root.append(this.container);
   }
 
   update(view: CityUIView): void {
     const gold = view.resources.gold;
     this.hud.update(view.resources);
+    this.eraChip.hidden = view.eraReady === null;
+    if (view.eraReady) setText(this.eraChipLabel, `Ready for the ${view.eraReady} Era`);
     this.problems.update(view.problems);
     this.researchPanel.update(view.research);
     this.researchButton.classList.toggle('btn-primary', view.research.open);
@@ -158,8 +175,42 @@ export class CityUI {
     this.toast.show(text);
   }
 
+  /**
+   * The new-era moment: a white flash and a banner, with the controls tucked away until the
+   * banner leaves.
+   */
+  playEraTransition(title: string, subtitle: string): void {
+    setText(this.eraBannerTitle, title);
+    setText(this.eraBannerSubtitle, subtitle);
+    window.clearTimeout(this.eraTimer);
+    this.eraOverlay.hidden = false;
+    this.container.classList.add('is-cinematic');
+    // Restart the CSS animations even if a previous transition is still showing.
+    this.eraOverlay.classList.remove('is-playing');
+    void this.eraOverlay.offsetWidth;
+    this.eraOverlay.classList.add('is-playing');
+    this.eraTimer = window.setTimeout(() => {
+      this.eraOverlay.hidden = true;
+      this.eraOverlay.classList.remove('is-playing');
+      this.container.classList.remove('is-cinematic');
+    }, ERA_TRANSITION.bannerMs);
+  }
+
   destroy(): void {
     this.toast.dispose();
+    window.clearTimeout(this.eraTimer);
     this.container.remove();
+  }
+
+  private createEraOverlay(): HTMLElement {
+    const overlay = el('div', 'era-transition');
+    overlay.hidden = true;
+    overlay.style.setProperty('--era-flash-ms', `${ERA_TRANSITION.flashMs}ms`);
+    overlay.style.setProperty('--era-banner-ms', `${ERA_TRANSITION.bannerMs}ms`);
+    const banner = el('div', 'era-banner');
+    banner.setAttribute('role', 'status');
+    banner.append(el('div', 'era-banner-kicker', 'A new era begins'), this.eraBannerTitle, this.eraBannerSubtitle);
+    overlay.append(el('div', 'era-flash'), banner);
+    return overlay;
   }
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { BuildingType } from '../building/types';
 import { MARKERS, SCENE_3D } from '../config/gameConfig';
+import type { EraId } from '../progression/era';
 import { tileToWorld, type TileCoord } from './coords';
 import { getBuildingGeometry } from './models';
 
@@ -37,7 +38,7 @@ export class TileMarkers {
     scene.add(this.previewTile);
 
     this.ghost = new THREE.Mesh(
-      getBuildingGeometry('house', 1),
+      getBuildingGeometry('house', 1, 'ancient'),
       new THREE.MeshStandardMaterial({
         vertexColors: true,
         flatShading: true,
@@ -55,13 +56,13 @@ export class TileMarkers {
     if (tile) this.selection.position.copy(tileToWorld(tile.col, tile.row, this.position));
   }
 
-  showPreview(type: BuildingType, level: number, tile: TileCoord, valid: boolean): void {
+  showPreview(type: BuildingType, level: number, era: EraId, tile: TileCoord, valid: boolean): void {
     tileToWorld(tile.col, tile.row, this.position);
     this.previewTile.position.copy(this.position).setY(SCENE_3D.tileTop + 0.006);
     this.previewTile.material.color.setHex(valid ? MARKERS.previewValid : MARKERS.previewInvalid);
     this.previewTile.visible = true;
 
-    this.ghost.geometry = getBuildingGeometry(type, level);
+    this.ghost.geometry = getBuildingGeometry(type, level, era);
     this.ghost.position.copy(this.position);
     this.ghost.visible = true;
   }

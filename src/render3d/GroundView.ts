@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { WORLD } from '../config/gameConfig';
+import { ERA_LOOK, WORLD } from '../config/gameConfig';
+import type { EraId } from '../progression/era';
 import type { GameState } from '../simulation/gameState';
 import { isUnlocked } from '../world/territory';
 import { tileToWorld } from './coords';
 import { PALETTE } from './models';
 
-/** The map: one instanced tile per grid cell (tinted by territory) on a soil slab. */
+/** The map: one instanced tile per grid cell (tinted by territory and era) on a soil slab. */
 export class GroundView {
   private readonly tiles: THREE.InstancedMesh;
   private readonly base: THREE.Mesh;
@@ -38,17 +39,18 @@ export class GroundView {
     scene.add(this.tiles);
   }
 
-  syncTerritory(state: GameState): void {
+  sync(state: GameState, era: EraId): void {
+    const look = ERA_LOOK[era];
     for (let row = 0; row < WORLD.rows; row++) {
       for (let col = 0; col < WORLD.cols; col++) {
         const checker = (col + row) % 2 === 0;
         const hex = isUnlocked(state, col, row)
           ? checker
-            ? PALETTE.grass
-            : PALETTE.grassAlt
+            ? look.grass
+            : look.grassAlt
           : checker
-            ? PALETTE.locked
-            : PALETTE.lockedAlt;
+            ? look.locked
+            : look.lockedAlt;
         this.tiles.setColorAt(row * WORLD.cols + col, this.color.setHex(hex));
       }
     }

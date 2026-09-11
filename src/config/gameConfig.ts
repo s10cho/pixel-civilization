@@ -1,3 +1,5 @@
+import type { EraId } from '../progression/era';
+
 /**
  * Central place for tunable presentation/engine constants. Gameplay balance numbers live in
  * `balance.ts`. Code must read values from here instead of hard-coding magic numbers.
@@ -41,9 +43,115 @@ export const CAMERA = {
 } as const;
 
 export const SCENE_3D = {
-  background: 0xa8d8ea,
   /** Height of the tile surface that buildings and citizens stand on. */
   tileTop: 0.1,
+} as const;
+
+/** Sky, light and ground colours per era (design brief §12: eras transform the whole city). */
+export interface EraLook {
+  sky: number;
+  hemiSky: number;
+  hemiGround: number;
+  hemiIntensity: number;
+  sunColor: number;
+  sunIntensity: number;
+  grass: number;
+  grassAlt: number;
+  locked: number;
+  lockedAlt: number;
+  /** Citizen clothing. */
+  shirts: readonly number[];
+  /** Share of locked tiles with a tree or rock. */
+  decorDensity: number;
+}
+
+export const ERA_LOOK: Record<EraId, EraLook> = {
+  ancient: {
+    sky: 0xa8d8ea,
+    hemiSky: 0xeaf6ff,
+    hemiGround: 0x55663a,
+    hemiIntensity: 1.2,
+    sunColor: 0xfff0d8,
+    sunIntensity: 2.4,
+    grass: 0x7cb85a,
+    grassAlt: 0x74b052,
+    locked: 0x3e4a3a,
+    lockedAlt: 0x39443a,
+    shirts: [0x9b6b3f, 0xb58a52, 0x7a8a4a, 0xc9a26b, 0x8a5a3a],
+    decorDensity: 0.55,
+  },
+  medieval: {
+    sky: 0xb4d4e8,
+    hemiSky: 0xf0f4ff,
+    hemiGround: 0x5a5f45,
+    hemiIntensity: 1.15,
+    sunColor: 0xffe9c9,
+    sunIntensity: 2.3,
+    grass: 0x86b865,
+    grassAlt: 0x7eaf5d,
+    locked: 0x4a4d3c,
+    lockedAlt: 0x44473a,
+    shirts: [0x3a6fb0, 0xb04a3a, 0x5a8a4a, 0x8a5aa0, 0xd9b43a],
+    decorDensity: 0.4,
+  },
+  industrial: {
+    sky: 0xc9c3b6,
+    hemiSky: 0xf3ead8,
+    hemiGround: 0x5c5446,
+    hemiIntensity: 1.1,
+    sunColor: 0xffd9a8,
+    sunIntensity: 2.2,
+    grass: 0x8fa86a,
+    grassAlt: 0x86a063,
+    locked: 0x514c42,
+    lockedAlt: 0x4b463d,
+    shirts: [0x3b3f4a, 0x5a4a3a, 0x2f4a6a, 0x6a6a6a, 0x8a3a3a],
+    decorDensity: 0.25,
+  },
+};
+
+/**
+ * The era change sequence (design brief §12): flash, the environment turns, then buildings
+ * transform one after another outward from the Town Hall, under a new-era banner.
+ */
+export const ERA_TRANSITION = {
+  /** When the sky, ground and scenery switch (hidden by the flash). */
+  environmentAtSeconds: 0.45,
+  /** When the first building transforms. */
+  buildingsStartSeconds: 0.9,
+  /** Delay between consecutive buildings... */
+  staggerSeconds: 0.12,
+  /** ...compressed so that a big city still finishes within this spread. */
+  maxSpreadSeconds: 2.4,
+  flashMs: 900,
+  bannerMs: 3600,
+} as const;
+
+/** Generative WebAudio music and synthesized sound effects. */
+export const AUDIO = {
+  defaultMusicVolume: 0.5,
+  defaultSfxVolume: 0.7,
+  /** Mix levels applied on top of the player's volumes. */
+  musicMix: 0.32,
+  sfxMix: 0.8,
+  /** Music is scheduled this far ahead of the audio clock, by a timer running this often. */
+  lookaheadSeconds: 0.3,
+  schedulerIntervalMs: 60,
+  /** Fade out/in when the music changes (e.g. a new era). */
+  crossfadeSeconds: 1.2,
+  /** The same sound effect is not retriggered faster than this. */
+  sfxMinIntervalSeconds: 0.04,
+} as const;
+
+/** Chimney smoke: puffs rise, drift with the wind, swell and fade. */
+export const SMOKE = {
+  lifetimeSeconds: 3.2,
+  riseSpeed: 0.32,
+  drift: [0.12, -0.05] as const,
+  startScale: 0.5,
+  peakScale: 1.6,
+  color: 0xd9d6d0,
+  opacity: 0.55,
 } as const;
 
 export type QualityLevel = 'high' | 'medium' | 'low';
@@ -57,12 +165,14 @@ export interface QualityPreset {
   shadowMapSize: number;
   /** Simulated citizens drawn on screen (the simulation always runs CITIZENS.maxSimulated). */
   renderedCitizens: number;
+  /** Smoke puffs alive per chimney. */
+  smokePuffs: number;
 }
 
 export const QUALITY: Record<QualityLevel, QualityPreset> = {
-  high: { antialias: true, maxPixelRatio: 2, shadowMapSize: 2048, renderedCitizens: 50 },
-  medium: { antialias: true, maxPixelRatio: 1.5, shadowMapSize: 1024, renderedCitizens: 35 },
-  low: { antialias: false, maxPixelRatio: 1, shadowMapSize: 0, renderedCitizens: 20 },
+  high: { antialias: true, maxPixelRatio: 2, shadowMapSize: 2048, renderedCitizens: 50, smokePuffs: 6 },
+  medium: { antialias: true, maxPixelRatio: 1.5, shadowMapSize: 1024, renderedCitizens: 35, smokePuffs: 4 },
+  low: { antialias: false, maxPixelRatio: 1, shadowMapSize: 0, renderedCitizens: 20, smokePuffs: 2 },
 };
 
 /** Selection frame and placement preview drawn on tiles. */
@@ -77,7 +187,6 @@ export const MARKERS = {
 } as const;
 
 export const CITIZEN_3D = {
-  shirtColors: [0x3a6fb0, 0xd9743a, 0x5aa05a, 0xb04a8a, 0xd9b43a],
   /** Walking bob: height in world units and speed in radians per second. */
   bobHeight: 0.03,
   bobSpeed: 14,

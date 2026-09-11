@@ -1,11 +1,15 @@
 import * as THREE from 'three';
-import { CAMERA, SCENE_3D, WORLD, type QualityPreset } from '../config/gameConfig';
+import { CAMERA, ERA_LOOK, WORLD, type QualityPreset } from '../config/gameConfig';
+import type { EraId } from '../progression/era';
 
 /** Owns the WebGL renderer, scene, lights and orthographic camera of the city view. */
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+  private readonly hemisphere = new THREE.HemisphereLight();
+  private readonly sun = new THREE.DirectionalLight();
+  private readonly sky = new THREE.Color();
 
   constructor(
     private readonly container: HTMLElement,
@@ -16,13 +20,24 @@ export class Stage {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     container.append(this.renderer.domElement);
 
-    this.scene.background = new THREE.Color(SCENE_3D.background);
+    this.scene.background = this.sky;
     this.addLights();
     this.resize();
   }
 
   get canvas(): HTMLCanvasElement {
     return this.renderer.domElement;
+  }
+
+  /** Sky and light colours for an era. */
+  applyEra(era: EraId): void {
+    const look = ERA_LOOK[era];
+    this.sky.setHex(look.sky);
+    this.hemisphere.color.setHex(look.hemiSky);
+    this.hemisphere.groundColor.setHex(look.hemiGround);
+    this.hemisphere.intensity = look.hemiIntensity;
+    this.sun.color.setHex(look.sunColor);
+    this.sun.intensity = look.sunIntensity;
   }
 
   /** Matches the canvas to its container; the camera keeps CAMERA.pixelsPerTile at zoom 1. */
@@ -52,9 +67,9 @@ export class Stage {
   }
 
   private addLights(): void {
-    this.scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x55663a, 1.2));
+    this.scene.add(this.hemisphere);
 
-    const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
+    const sun = this.sun;
     sun.position.set(-10, 18, 8);
     sun.castShadow = this.quality.shadowMapSize > 0;
     sun.shadow.mapSize.set(this.quality.shadowMapSize, this.quality.shadowMapSize);

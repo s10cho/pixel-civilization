@@ -1,3 +1,4 @@
+import { audio } from './audio/AudioEngine';
 import { CityScreen } from './screens/CityScreen';
 import { MenuScreen } from './screens/MenuScreen';
 import type { Screen } from './screens/Screen';
@@ -17,11 +18,17 @@ function show(next: Screen): void {
 }
 
 function showMenu(): void {
+  audio.playMusic('ancient');
   show(new MenuScreen(uiRoot, { onNewGame: showCity }));
 }
 
 function showCity(): void {
   show(new CityScreen(viewRoot!, uiRoot, { onExit: showMenu }));
+}
+
+// Browsers allow audio only after a user gesture; any press unlocks (or resumes) it.
+for (const type of ['pointerdown', 'keydown'] as const) {
+  window.addEventListener(type, () => audio.unlock(), { capture: true });
 }
 
 showMenu();
