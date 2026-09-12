@@ -1,4 +1,4 @@
-import { ERA_REQUIREMENTS, PROGRESSION } from '../config/balance';
+import { ERA_REQUIREMENTS, HERITAGE, PROGRESSION } from '../config/balance';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import type { GameState } from '../simulation/gameState';
 import { nextEra, type EraId } from './era';
@@ -50,8 +50,25 @@ export function advanceEra(state: GameState): { ok: true; era: EraId } | { ok: f
   if (!progress) return { ok: false, error: 'finalEra' };
   if (!progress.ready) return { ok: false, error: 'requirementsNotMet' };
 
+  const previous = state.era;
   state.era = progress.next;
   state.eraHistory.push({ era: progress.next, at: Date.now() });
+  keepOldTown(state, previous);
   gainXp(state, PROGRESSION.xp.era);
   return { ok: true, era: progress.next };
+}
+
+/**
+ * Marks the city's oldest buildings as heritage, so they keep the look of the era they were
+ * built in instead of being modernised away (Phase 2 §11).
+ */
+function keepOldTown(state: GameState, previousEra: EraId): void {
+  const oldest = state.buildings
+    .filter((building) => (building.builtEra ?? previousEra) !== state.era && !building.heritage)
+    .sort((a, b) => a.id - b.id)
+    .slice(0, HERITAGE.autoCount);
+  for (const building of oldest) {
+    building.builtEra ??= previousEra;
+    building.heritage = true;
+  }
 }

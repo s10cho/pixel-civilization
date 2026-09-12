@@ -47,6 +47,8 @@ export interface GameState {
   lastSeen: { at: number; population: number; buildings: number; gold: number } | null;
   /** Achievements the city has reached (see progression/achievements.ts). */
   achievements: AchievementId[];
+  /** Time of day, 0..1 (see config DAY_NIGHT). */
+  timeOfDay: number;
   /** Seconds until the next happy event (see simulation/events.ts). */
   nextEventSeconds: number;
   /** Large works under construction (see simulation/projects.ts). */
@@ -84,6 +86,8 @@ export function createInitialState(seed: number = Date.now()): GameState {
     eraHistory: [{ era: 'ancient', at: Date.now() }],
     lastSeen: null,
     achievements: [],
+    // Mid-morning: a new city opens in daylight.
+    timeOfDay: 0.3,
     nextEventSeconds: EVENTS.intervalSeconds[0],
     nextBuildingId: 1,
     nextCitizenId: 1,
@@ -100,6 +104,7 @@ export function createInitialState(seed: number = Date.now()): GameState {
     col: Math.floor(WORLD.cols / 2),
     row: Math.floor(WORLD.rows / 2),
     level: 1,
+    builtEra: 'ancient',
   });
 
   return state;

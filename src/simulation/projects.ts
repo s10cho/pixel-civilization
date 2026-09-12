@@ -171,6 +171,13 @@ function complete(state: GameState, project: Project): void {
  */
 function raise(state: GameState, type: BuildingType, tile: { col: number; row: number }): void {
   if (!canBuildOn(state, tile.col, tile.row)) return;
-  state.buildings.push({ id: state.nextBuildingId++, type, col: tile.col, row: tile.row, level: 1 });
+  state.buildings.push({
+    id: state.nextBuildingId++,
+    type,
+    col: tile.col,
+    row: tile.row,
+    level: 1,
+    builtEra: state.era,
+  });
   gainXp(state, PROGRESSION.xp.build);
 }

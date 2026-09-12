@@ -33,6 +33,17 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
   and entering an era stay your decisions.
 - **Growth pace**: Relaxed, Standard or Fast. Pace changes speed only — nothing can fail or be
   lost at any setting (see `docs/phase2-design.md`).
+- **AI consulting**: reads the city, points at what stands out, and offers a few plans —
+  candidate places for new homes or trade, more land, or a large project — which it carries out
+  once you accept. It never decides for you.
+- **Your decisions stay yours**: the territory grows towards the side you choose, and large
+  projects (a railway across the city, a tunnel through the rock, a central park) are
+  commissioned and then visibly built.
+- **A city with a history**: rocky ridges to grow around, an old quarter that keeps its
+  original era while the rest modernises, and a City history card comparing the beginning with
+  now.
+- **Something always moving**: day turns to night and the windows light up, cars run the roads
+  and a train runs the rails.
 - **Achievements**: nineteen gentle milestones with progress bars and small gold rewards.
 - **Small gifts**: a traveling merchant, a good harvest, a village festival or a wandering
   scholar drops by now and then. No event ever sets the city back.

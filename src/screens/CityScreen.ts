@@ -32,6 +32,8 @@ import { CitizenView } from '../render3d/CitizenView';
 import type { TileCoord } from '../render3d/coords';
 import { ConstructionView } from '../render3d/ConstructionView';
 import { DecorView } from '../render3d/DecorView';
+import { NightLightsView } from '../render3d/NightLightsView';
+import { TrafficView } from '../render3d/TrafficView';
 import { GroundView } from '../render3d/GroundView';
 import { FrameRateMonitor, lowerQuality, resolveQualityLevel } from '../render3d/quality';
 import { SmokeView } from '../render3d/SmokeView';
@@ -146,6 +148,8 @@ export class CityScreen implements Screen {
   private decor!: DecorView;
   private smoke!: SmokeView;
   private construction!: ConstructionView;
+  private lights!: NightLightsView;
+  private traffic!: TrafficView;
   private citizens!: CitizenView;
   private markers!: TileMarkers;
   private picker!: TilePicker;
@@ -167,7 +171,10 @@ export class CityScreen implements Screen {
   /** Buildings still showing an older era's model during a transition. */
   private readonly eraOverrides = new Map<number, EraId>();
   private transition: EraTransition | null = null;
-  private readonly eraOf = (building: Building): EraId => this.eraOverrides.get(building.id) ?? this.state.era;
+  private readonly eraOf = (building: Building): EraId =>
+    // Mid-transition every building shows its old self; afterwards, kept quarters stay old.
+    this.eraOverrides.get(building.id) ??
+    (building.heritage ? (building.builtEra ?? this.state.era) : this.state.era);
   /** Roads take their shape from the roads around them. */
   private readonly variantOf = (building: Building): number =>
     building.type === 'road' ? roadConnections(this.state, building.col, building.row) : 0;
@@ -230,6 +237,8 @@ export class CityScreen implements Screen {
     this.decor = new DecorView(this.stage.scene);
     this.smoke = new SmokeView(this.stage.scene, quality.smokePuffs);
     this.construction = new ConstructionView(this.stage.scene);
+    this.lights = new NightLightsView(this.stage.scene);
+    this.traffic = new TrafficView(this.stage.scene, quality.vehicles);
     this.citizens = new CitizenView(this.stage.scene, quality.renderedCitizens);
     this.markers = new TileMarkers(this.stage.scene);
     this.applyEnvironment(this.state.era);
@@ -306,6 +315,8 @@ export class CityScreen implements Screen {
     this.decor.dispose();
     this.smoke.dispose();
     this.construction.dispose();
+    this.lights.dispose();
+    this.traffic.dispose();
     this.citizens.dispose();
     this.ui.destroy();
     // Removing the canvas also drops its pointer listeners.
@@ -346,6 +357,10 @@ export class CityScreen implements Screen {
     }
 
     const seconds = now / 1000;
+    // The hour of the day: the sky dims and the city lights up.
+    this.stage.applyTimeOfDay(this.state.timeOfDay);
+    this.lights.setDarkness(Stage.darknessAt(this.state.timeOfDay));
+    this.traffic.animate(frameSeconds);
     this.updateTransition(seconds);
     this.citizens.render(this.accumulator / SIMULATION.tickSeconds, seconds);
     this.buildings.animate(seconds);
@@ -359,6 +374,7 @@ export class CityScreen implements Screen {
         onSelectTool: (type) => this.selectTool(type),
         onUpgrade: (buildingId) => this.upgrade(buildingId),
         onMoveBuilding: (buildingId) => this.toggleMove(buildingId),
+        onToggleHeritage: (buildingId) => this.toggleHeritage(buildingId),
         onCloseBuildingPanel: () => this.clearSelection(),
         onExpand: () => this.expand(),
         onFocusProblem: (kind) => this.focusProblem(kind),
@@ -935,6 +951,8 @@ export class CityScreen implements Screen {
   private syncBuildings(): void {
     this.buildings.sync(this.state.buildings, this.eraOf, this.variantOf);
     this.smoke.sync(this.state.buildings, this.eraOf);
+    this.lights.sync(this.state.buildings);
+    this.traffic.sync(this.state.buildings);
   }
 
   private showTownHall(): void {
@@ -1018,6 +1036,19 @@ export class CityScreen implements Screen {
   private cancelMove(): void {
     this.movingBuildingId = null;
     this.updatePreview();
+    this.refreshUI();
+  }
+
+  /** Keeps a building in its own era, or lets it modernise with the rest of the city. */
+  private toggleHeritage(buildingId: number): void {
+    const building = this.state.buildings.find((candidate) => candidate.id === buildingId);
+    if (!building) return;
+    building.heritage = !building.heritage;
+    building.builtEra ??= this.state.era;
+    this.syncBuildings();
+    this.popBuilding(buildingId);
+    audio.play('select');
+    this.ui.showMessage(t(building.heritage ? 'toast.heritageOn' : 'toast.heritageOff'));
     this.refreshUI();
   }
 
@@ -1255,6 +1286,7 @@ export class CityScreen implements Screen {
     this.stage.setQuality(preset);
     this.citizens.setLimit(preset.renderedCitizens);
     this.smoke.setPuffs(preset.smokePuffs);
+    this.traffic.setLimit(preset.vehicles);
     this.syncBuildings();
   }
 

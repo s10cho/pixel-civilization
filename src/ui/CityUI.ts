@@ -26,6 +26,7 @@ export interface CityUIHandlers {
   onSelectTool(type: BuildingType): void;
   onUpgrade(buildingId: number): void;
   onMoveBuilding(buildingId: number): void;
+  onToggleHeritage(buildingId: number): void;
   onCloseBuildingPanel(): void;
   onExpand(): void;
   onFocusProblem(kind: ProblemKind): void;
@@ -154,6 +155,7 @@ export class CityUI {
     this.buildingPanel = new BuildingPanel({
       onUpgrade: handlers.onUpgrade,
       onMove: handlers.onMoveBuilding,
+      onToggleHeritage: handlers.onToggleHeritage,
       onAdvanceEra: handlers.onAdvanceEra,
       onClose: handlers.onCloseBuildingPanel,
     });

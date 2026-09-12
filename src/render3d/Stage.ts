@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAMERA, ERA_LOOK, WORLD, type QualityPreset } from '../config/gameConfig';
+import { CAMERA, DAY_NIGHT, ERA_LOOK, WORLD, type QualityPreset } from '../config/gameConfig';
 import type { EraId } from '../progression/era';
 
 /** Owns the WebGL renderer, scene, lights and orthographic camera of the city view. */
@@ -10,6 +10,9 @@ export class Stage {
   private readonly hemisphere = new THREE.HemisphereLight();
   private readonly sun = new THREE.DirectionalLight();
   private readonly sky = new THREE.Color();
+  private era: EraId = 'ancient';
+  private readonly dayColour = new THREE.Color();
+  private readonly nightColour = new THREE.Color(DAY_NIGHT.nightSky);
 
   constructor(
     private readonly container: HTMLElement,
@@ -31,13 +34,37 @@ export class Stage {
 
   /** Sky and light colours for an era. */
   applyEra(era: EraId): void {
+    this.era = era;
     const look = ERA_LOOK[era];
-    this.sky.setHex(look.sky);
+    this.dayColour.setHex(look.sky);
+    this.sky.copy(this.dayColour);
     this.hemisphere.color.setHex(look.hemiSky);
     this.hemisphere.groundColor.setHex(look.hemiGround);
     this.hemisphere.intensity = look.hemiIntensity;
     this.sun.color.setHex(look.sunColor);
     this.sun.intensity = look.sunIntensity;
+  }
+
+  /**
+   * How dark it is right now (0 in daylight, 1 at the middle of the night). Dusk and dawn are
+   * short fades, so most of the day is bright and nights are a visible event.
+   */
+  static darknessAt(timeOfDay: number): number {
+    const { duskAt, dawnAt, twilight } = DAY_NIGHT;
+    if (timeOfDay >= duskAt + twilight || timeOfDay <= dawnAt - twilight) return 1;
+    if (timeOfDay >= duskAt) return (timeOfDay - duskAt) / twilight;
+    if (timeOfDay <= dawnAt) return 1 - (timeOfDay - (dawnAt - twilight)) / twilight;
+    return 0;
+  }
+
+  /** Applies the hour of the day: the sky darkens and the sun fades. */
+  applyTimeOfDay(timeOfDay: number): void {
+    const look = ERA_LOOK[this.era];
+    const darkness = Stage.darknessAt(timeOfDay);
+    this.sky.copy(this.dayColour).lerp(this.nightColour, darkness);
+    const daylight = 1 - darkness * (1 - DAY_NIGHT.nightLight);
+    this.sun.intensity = look.sunIntensity * daylight;
+    this.hemisphere.intensity = look.hemiIntensity * Math.max(DAY_NIGHT.nightLight, daylight);
   }
 
   /**

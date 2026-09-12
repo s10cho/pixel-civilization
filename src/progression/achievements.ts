@@ -24,7 +24,15 @@ export type AchievementId =
   | 'wideTerritory'
   | 'happiness80'
   | 'building3'
-  | 'firstRailway';
+  | 'firstRailway'
+  | 'population1000'
+  | 'happiness90'
+  | 'parks20'
+  | 'territory1000'
+  | 'throughTheMountain'
+  | 'roads50'
+  | 'buildings150'
+  | 'oldTown';
 
 interface AchievementDefinition {
   /** How far the city has come on this achievement's measure. */
@@ -73,6 +81,23 @@ const DEFINITIONS: Record<AchievementId, AchievementDefinition> = {
     measure: (s) => countType(s, 'railway'),
     target: () => 1,
     rewardGold: ACHIEVEMENTS_REWARD.large,
+  },
+  // The gentle long-term milestones of Phase 2 §12: no pressure, just something to walk towards.
+  population1000: {
+    measure: (s) => Math.floor(s.resources.population),
+    target: () => 1000,
+    rewardGold: ACHIEVEMENTS_REWARD.large,
+  },
+  happiness90: { measure: (s) => Math.floor(s.resources.happiness), target: () => 90, rewardGold: ACHIEVEMENTS_REWARD.large },
+  parks20: { measure: (s) => countType(s, 'park'), target: () => 20, rewardGold: ACHIEVEMENTS_REWARD.large },
+  territory1000: { measure: territoryTileCount, target: () => 1000, rewardGold: ACHIEVEMENTS_REWARD.large },
+  throughTheMountain: { measure: (s) => s.clearedTiles.length, target: () => 1, rewardGold: ACHIEVEMENTS_REWARD.large },
+  roads50: { measure: (s) => countType(s, 'road'), target: () => 50, rewardGold: ACHIEVEMENTS_REWARD.medium },
+  buildings150: { measure: (s) => s.buildings.length, target: () => 150, rewardGold: ACHIEVEMENTS_REWARD.large },
+  oldTown: {
+    measure: (s) => s.buildings.reduce((total, building) => total + (building.heritage ? 1 : 0), 0),
+    target: () => 5,
+    rewardGold: ACHIEVEMENTS_REWARD.medium,
   },
   building3: {
     measure: (s) => s.buildings.reduce((best, building) => Math.max(best, building.level), 0),

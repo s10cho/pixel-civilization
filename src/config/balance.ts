@@ -1531,6 +1531,15 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
 };
 
 /**
+ * Keeping the past (Phase 2 §11): when the city enters a new era, its oldest corner stays as
+ * it was, so a walk through the city is also a walk through its history.
+ */
+export const HERITAGE = {
+  /** Oldest buildings kept in their original era when an era begins. */
+  autoCount: 5,
+} as const;
+
+/**
  * Large projects (Phase 2 §8): the player commissions them, and then they take time, so the
  * city visibly has work going on. None of them can fail — they only take a while.
  */

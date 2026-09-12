@@ -28,6 +28,7 @@ export function migrateState(version: number, raw: unknown): GameState {
     stored.eraHistory = [{ era: stored.era ?? 'ancient', at: stored.foundedAt }];
   }
 
+  if (typeof stored.timeOfDay !== 'number') stored.timeOfDay = 0.3;
   if (!Array.isArray(stored.projects)) stored.projects = [];
   if (typeof stored.nextProjectId !== 'number') stored.nextProjectId = 1;
   if (typeof stored.terrainSeed !== 'number') stored.terrainSeed = 1;

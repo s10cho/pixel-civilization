@@ -178,6 +178,40 @@ export const AUDIO = {
   sfxMinIntervalSeconds: 0.04,
 } as const;
 
+/**
+ * The city's own clock. Nights are part of watching it grow: windows light up and the streets
+ * pick up lamps (Phase 2 §1.1).
+ */
+export const DAY_NIGHT = {
+  /** Seconds for one full day. */
+  daySeconds: 300,
+  /** Time of day (0..1) when the lights come on and go off again. */
+  duskAt: 0.7,
+  dawnAt: 0.22,
+  /** How long dusk and dawn take, as a share of the day. */
+  twilight: 0.06,
+  /** Share of daylight left at the darkest point. */
+  nightLight: 0.3,
+  nightSky: 0x1b2740,
+  /** Warm colour of lit windows and street lamps. */
+  lampColor: 0xffd79a,
+  /** Brightest the lamps get. */
+  lampOpacity: 0.9,
+} as const;
+
+/** Cars and trains that keep the streets moving (see render3d/TrafficView.ts). */
+export const TRAFFIC = {
+  maxVehicles: 40,
+  /** Road tiles needed per car, and rail tiles before a train appears. */
+  tilesPerCar: 3,
+  tilesPerTrain: 4,
+  /** Tiles per second. */
+  carSpeed: [0.5, 0.9] as const,
+  trainSpeed: 1.4,
+  carColors: [0xf2f2f2, 0x4a6fa5, 0xc8553d, 0x3f7f5a, 0x6a6a72, 0xe0b23a] as const,
+  trainColor: 0xb0472f,
+} as const;
+
 /** Chimney smoke: puffs rise, drift with the wind, swell and fade. */
 export const SMOKE = {
   lifetimeSeconds: 3.2,
@@ -202,12 +236,14 @@ export interface QualityPreset {
   renderedCitizens: number;
   /** Smoke puffs alive per chimney. */
   smokePuffs: number;
+  /** Vehicles on the streets at once. */
+  vehicles: number;
 }
 
 export const QUALITY: Record<QualityLevel, QualityPreset> = {
-  high: { antialias: true, maxPixelRatio: 2, shadowMapSize: 2048, renderedCitizens: 50, smokePuffs: 6 },
-  medium: { antialias: true, maxPixelRatio: 1.5, shadowMapSize: 1024, renderedCitizens: 35, smokePuffs: 4 },
-  low: { antialias: false, maxPixelRatio: 1, shadowMapSize: 0, renderedCitizens: 20, smokePuffs: 2 },
+  high: { antialias: true, maxPixelRatio: 2, shadowMapSize: 2048, renderedCitizens: 50, smokePuffs: 6, vehicles: 40 },
+  medium: { antialias: true, maxPixelRatio: 1.5, shadowMapSize: 1024, renderedCitizens: 35, smokePuffs: 4, vehicles: 24 },
+  low: { antialias: false, maxPixelRatio: 1, shadowMapSize: 0, renderedCitizens: 20, smokePuffs: 2, vehicles: 10 },
 };
 
 /** Adaptive quality ("Auto"): step down a preset when the frame rate stays low. */

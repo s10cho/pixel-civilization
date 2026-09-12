@@ -45,7 +45,7 @@ export function placeBuilding(
   if (error) return { ok: false, error };
 
   state.resources.gold -= getBuildCost(type, state.era);
-  state.buildings.push({ id: state.nextBuildingId++, type, col, row, level: 1 });
+  state.buildings.push({ id: state.nextBuildingId++, type, col, row, level: 1, builtEra: state.era });
   gainXp(state, PROGRESSION.xp.build);
   return { ok: true };
 }

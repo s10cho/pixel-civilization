@@ -47,14 +47,17 @@ The three pleasures to protect, in order:
 
 ## Slices
 
-| Slice | Content | Brief |
-| --- | --- | --- |
-| A | Growth pace (relaxed/standard/fast) and automation level (off/low/medium/high) | §3, §7 |
-| B | Growth feedback: city history against day one, and a "since your last visit" summary | §9 |
-| C | AI consulting: small advice, three-candidate proposals, city-scale plans | §6, §8 |
-| D | Macro decisions: choosing the direction the territory grows, large projects | §1.3, §8 |
-| E | Keeping the past: districts that stay in an older era's clothes | §11 |
-| F | Milestones: gentle long-term goals (1,000 citizens, first railway, 10,000 tiles) | §12 |
-| G | Visible growth: night lighting, traffic, hills, tunnels, railways, new towns | §1.1 |
+| Slice | Content | Brief | State |
+| --- | --- | --- | --- |
+| A | Growth pace (relaxed/standard/fast) and automation level (off/low/medium/high) | §3, §7 | done |
+| B | Growth feedback: city history against the beginning, richer welcome-back summary | §9 | done |
+| C | AI consulting: advice with a place to look, three candidate plans, one-tap execution | §6, §8 | done |
+| D | Macro decisions: the side the territory grows towards, rocky terrain, large projects | §1.3, §8 | done |
+| E | Keeping the past: the oldest quarter stays in its own era, and any building can be kept | §11 | done |
+| F | Milestones: gentle long-term goals (1,000 citizens, first railway, 1,000 tiles) | §12 | done |
+| G | Visible growth: night lighting, traffic on the roads, rails, tunnels through the hills | §1.1 | done |
+
+Still open for later: automatic traffic planning and district tidying (§0), difficulty levels
+beyond the growth pace (§5), and city memory notes beyond "standing here since the ..." (§10).
 
 Automation must never swallow the game: above a certain size, a change asks the player first.

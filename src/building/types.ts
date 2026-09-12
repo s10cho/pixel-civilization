@@ -175,4 +175,8 @@ export interface Building {
   col: number;
   row: number;
   level: number;
+  /** The era it was built in, so the city can keep its old quarters (Phase 2 §11). */
+  builtEra?: EraId;
+  /** Kept as it is when the eras move on: an old town, the old market street. */
+  heritage?: boolean;
 }

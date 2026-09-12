@@ -1,6 +1,7 @@
 import { syncCitizens } from '../citizen/assignment';
 import { updateCitizens } from '../citizen/behavior';
 import { GROWTH_PACE, PROGRESSION } from '../config/balance';
+import { DAY_NIGHT } from '../config/gameConfig';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
 import { updateHappiness } from '../economy/happiness';
 import { applyProduction } from '../economy/production';
@@ -10,6 +11,7 @@ import type { GameState } from './gameState';
 
 /** Advances the whole simulation by one fixed step and returns the report it was based on. */
 export function tickSimulation(state: GameState, dtSeconds: number): CityReport {
+  state.timeOfDay = (state.timeOfDay + dtSeconds / DAY_NIGHT.daySeconds) % 1;
   const report = computeCityReport(state);
   applyProduction(state, report, dtSeconds);
   advanceResearch(state, report.researchPerSecond * GROWTH_PACE[state.growthPace].research, dtSeconds);

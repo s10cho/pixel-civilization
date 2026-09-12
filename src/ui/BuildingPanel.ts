@@ -14,6 +14,8 @@ import { effectText } from './messages';
 export interface BuildingPanelHandlers {
   onUpgrade(buildingId: number): void;
   onMove(buildingId: number): void;
+  /** Keep this building in the era it was built in, or let it modernise. */
+  onToggleHeritage(buildingId: number): void;
   onAdvanceEra(): void;
   onClose(): void;
 }
@@ -101,6 +103,9 @@ export class BuildingPanel {
   private readonly upgradeCost = el('span', 'btn-cost');
   private readonly moveButton: HTMLButtonElement;
   private readonly moveLabel: HTMLElement;
+  private readonly heritageButton: HTMLButtonElement;
+  private readonly heritageLabel: HTMLElement;
+  private readonly memory = el('div', 'panel-memory');
   private renderedEffects = '';
   private buildingId: number | null = null;
   private badgeType: string | null = null;
@@ -135,7 +140,17 @@ export class BuildingPanel {
       },
     });
     this.moveLabel = this.moveButton.querySelector('.btn-label')!;
-    this.actions.append(this.upgradeButton, this.moveButton);
+
+    this.heritageButton = button({
+      icon: 'clock',
+      label: t('panel.heritage'),
+      className: 'heritage-button',
+      onClick: () => {
+        if (this.buildingId !== null) handlers.onToggleHeritage(this.buildingId);
+      },
+    });
+    this.heritageLabel = this.heritageButton.querySelector('.btn-label')!;
+    this.actions.append(this.upgradeButton, this.moveButton, this.heritageButton);
 
     this.statList.append(...Object.values(this.stats).map((stat) => stat.row));
 
@@ -154,7 +169,7 @@ export class BuildingPanel {
     this.era.append(this.eraTitle, this.eraNext, this.eraRequirements, this.advanceButton);
     this.city.append(cityTitle, xpTrack, this.cityNote, this.era);
 
-    this.element.append(header, this.description, this.city, this.statList, this.effects, this.actions);
+    this.element.append(header, this.description, this.memory, this.city, this.statList, this.effects, this.actions);
     this.element.hidden = true;
   }
 
@@ -173,6 +188,12 @@ export class BuildingPanel {
     setText(this.title, buildingName(building.type, view.era));
     setText(this.level, t('panel.level', { level: building.level, max: definition.maxLevel }));
     setText(this.description, buildingDescription(building.type));
+
+    // The city's memory: this building has been here since an earlier age.
+    const builtEra = building.builtEra;
+    const older = builtEra !== undefined && builtEra !== view.era;
+    this.memory.hidden = !older;
+    if (older) setText(this.memory, t('panel.memory', { era: eraName(builtEra) }));
 
     this.city.hidden = view.city === null;
     if (view.city) {
@@ -247,7 +268,13 @@ export class BuildingPanel {
     this.moveButton.hidden = !definition.movable;
     this.moveButton.classList.toggle('btn-primary', view.moving);
     setText(this.moveLabel, t(view.moving ? 'panel.cancelMove' : 'panel.move'));
-    this.actions.hidden = this.upgradeButton.hidden && this.moveButton.hidden;
+
+    // Keeping a building as it is only means something once an era has passed.
+    const canKeep = builtEra !== undefined;
+    this.heritageButton.hidden = !canKeep;
+    this.heritageButton.classList.toggle('btn-primary', building.heritage === true);
+    setText(this.heritageLabel, t(building.heritage ? 'panel.heritageOn' : 'panel.heritage'));
+    this.actions.hidden = this.upgradeButton.hidden && this.moveButton.hidden && this.heritageButton.hidden;
   }
 
   private updateEra(era: EraInfo): void {
