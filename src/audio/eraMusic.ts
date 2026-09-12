@@ -64,6 +64,21 @@ export const ERA_MUSIC: Record<EraId, EraMusic> = {
       { kind: 'tambourine', pattern: 'x.xxx.xxx.xxx.xx', gain: 0.08 },
     ],
   },
+  // Modern: a calm lo-fi groove, soft keys over a warm bass.
+  modern: {
+    bpm: 96,
+    root: 53,
+    scale: [0, 2, 4, 7, 9],
+    progression: [0, 3, 4, 2],
+    pad: { wave: 'triangle', gain: 0.1, filter: 1600 },
+    bass: { wave: 'sine', pattern: 'x.....x...x.....', octave: -1, gain: 0.3, decay: 0.45, filter: 700 },
+    lead: { wave: 'triangle', octave: 1, every: 2, density: 0.3, gain: 0.1, decay: 0.5, vibrato: 3, filter: 3200 },
+    drums: [
+      { kind: 'kick', pattern: 'x.......x.......', gain: 0.34 },
+      { kind: 'snare', pattern: '....x.......x...', gain: 0.12 },
+      { kind: 'hat', pattern: '..x...x...x...x.', gain: 0.06 },
+    ],
+  },
   // Mechanical: a driving saw bass, clanking metal and ticking hats.
   industrial: {
     bpm: 116,

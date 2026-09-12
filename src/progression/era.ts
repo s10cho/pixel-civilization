@@ -1,7 +1,7 @@
-/** Civilization eras playable in the MVP, oldest first. */
-export type EraId = 'ancient' | 'medieval' | 'industrial';
+/** Civilization eras, oldest first. */
+export type EraId = 'ancient' | 'medieval' | 'industrial' | 'modern';
 
-export const ERAS: readonly EraId[] = ['ancient', 'medieval', 'industrial'];
+export const ERAS: readonly EraId[] = ['ancient', 'medieval', 'industrial', 'modern'];
 
 export function eraIndex(era: EraId): number {
   return ERAS.indexOf(era);

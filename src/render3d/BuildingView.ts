@@ -14,6 +14,9 @@ interface RotorBatch {
 /** Which era's model to show for a building (differs per building during an era transition). */
 export type EraOf = (building: Building) => EraId;
 
+/** Shape variant for buildings that depend on their surroundings (roads). */
+export type VariantOf = (building: Building) => number;
+
 /**
  * Draws buildings with one InstancedMesh per (type, level, era) model, so draw calls stay flat
  * no matter how many buildings the city has. Moving parts (rotors) get their own instanced
@@ -43,15 +46,18 @@ export class BuildingView {
 
   constructor(private readonly scene: THREE.Scene) {}
 
-  sync(buildings: readonly Building[], eraOf: EraOf): void {
+  sync(buildings: readonly Building[], eraOf: EraOf, variantOf: VariantOf = () => 0): void {
     this.lastBuildings = buildings;
     const groups = new Map<string, Building[]>();
     const eras = new Map<number, EraId>();
+    const variants = new Map<number, number>();
     const rotorGroups = new Map<string, { building: Building; rotor: Rotor }[]>();
     for (const building of buildings) {
       const era = eraOf(building);
       eras.set(building.id, era);
-      push(groups, `${building.type}:${building.level}:${era}`, building);
+      const variant = variantOf(building);
+      variants.set(building.id, variant);
+      push(groups, `${building.type}:${building.level}:${era}:${variant}`, building);
       const rotor = getRotor(building.type, building.level, era);
       if (rotor) push(rotorGroups, rotor.key, { building, rotor });
     }
@@ -64,7 +70,10 @@ export class BuildingView {
       if (!batch || batch.instanceMatrix.count < group.length) {
         if (batch) this.removeMesh(batch);
         const sample = group[0];
-        batch = this.createMesh(getBuildingGeometry(sample.type, sample.level, eras.get(sample.id)!), group.length);
+        batch = this.createMesh(
+          getBuildingGeometry(sample.type, sample.level, eras.get(sample.id)!, variants.get(sample.id)!),
+          group.length,
+        );
         this.batches.set(key, batch);
       }
       group.forEach((building, index) => {

@@ -53,6 +53,7 @@ import type { TutorialView } from '../ui/TutorialCard';
 import { loadPreferences, savePreferences, type Preferences } from '../storage/preferences';
 import { Tutorial, TUTORIAL_STEPS, type TutorialEvent } from '../tutorial/tutorial';
 import { getBuildingAt } from '../world/placement';
+import { roadConnections } from '../world/roads';
 import { getExpansionCost, getUnlockedArea } from '../world/territory';
 import type { Screen } from './Screen';
 
@@ -135,6 +136,9 @@ export class CityScreen implements Screen {
   private readonly eraOverrides = new Map<number, EraId>();
   private transition: EraTransition | null = null;
   private readonly eraOf = (building: Building): EraId => this.eraOverrides.get(building.id) ?? this.state.era;
+  /** Roads take their shape from the roads around them. */
+  private readonly variantOf = (building: Building): number =>
+    building.type === 'road' ? roadConnections(this.state, building.col, building.row) : 0;
 
   private activeTool: BuildingType | null = null;
   private movingBuildingId: number | null = null;
@@ -770,7 +774,7 @@ export class CityScreen implements Screen {
   }
 
   private syncBuildings(): void {
-    this.buildings.sync(this.state.buildings, this.eraOf);
+    this.buildings.sync(this.state.buildings, this.eraOf, this.variantOf);
     this.smoke.sync(this.state.buildings, this.eraOf);
   }
 
@@ -1078,6 +1082,7 @@ export class CityScreen implements Screen {
     if (performance.now() > this.newUnlocksUntil) this.newUnlocks.clear();
     return BUILDABLE_TYPES.map((type) => ({
       type,
+      category: BUILDINGS[type].category,
       name: buildingName(type, this.state.era),
       cost: getBuildCost(type, this.state.era),
       unlock: getUnlockState(type, this.state),

@@ -17,6 +17,11 @@ const MIX: Record<EraId, [DecorKind, number][]> = {
     ['pine', 0.2],
     ['rock', 0.2],
   ],
+  modern: [
+    ['broadleaf', 0.5],
+    ['pine', 0.25],
+    ['rock', 0.25],
+  ],
   industrial: [
     ['rock', 0.4],
     ['stump', 0.3],

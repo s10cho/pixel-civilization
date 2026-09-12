@@ -23,6 +23,7 @@ export const ERA_SETTINGS: Record<
   ancient: { costMultiplier: 1, outputMultiplier: 1, powerDemandMultiplier: 1 },
   medieval: { costMultiplier: 1.4, outputMultiplier: 1.8, powerDemandMultiplier: 1.35 },
   industrial: { costMultiplier: 1.9, outputMultiplier: 3, powerDemandMultiplier: 1.9 },
+  modern: { costMultiplier: 2.4, outputMultiplier: 4.5, powerDemandMultiplier: 2.3 },
 };
 
 /**
@@ -32,6 +33,7 @@ export const ERA_SETTINGS: Record<
 export const ERA_REQUIREMENTS: Record<Exclude<EraId, 'ancient'>, { population: number; cityLevel: number }> = {
   medieval: { population: 40, cityLevel: 4 },
   industrial: { population: 120, cityLevel: 7 },
+  modern: { population: 250, cityLevel: 10 },
 };
 
 export const POWER = {
@@ -50,6 +52,8 @@ export const ADJACENCY = {
   shopPerHouseBonus: 0.15,
   shopMaxHouses: 3,
   factoryNearPowerBonus: 0.15,
+  /** Trade and industry next to a road earn more. */
+  roadGoldBonus: 0.12,
   /** Growth bonus scales with the share of houses that have a park next door. */
   parkHomeGrowthBonus: 0.2,
   parkHomeHappiness: 5,
@@ -141,6 +145,7 @@ const NO_OUTPUT = {
 export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   townHall: {
     ...NO_OUTPUT,
+    category: 'civic',
     buildable: false,
     movable: false,
     era: 'ancient',
@@ -153,6 +158,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   house: {
     ...NO_OUTPUT,
+    category: 'housing',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -164,6 +170,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   farm: {
     ...NO_OUTPUT,
+    category: 'food',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -177,6 +184,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   shop: {
     ...NO_OUTPUT,
+    category: 'commerce',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -190,6 +198,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   workshop: {
     ...NO_OUTPUT,
+    category: 'industry',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -203,6 +212,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   park: {
     ...NO_OUTPUT,
+    category: 'leisure',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -215,6 +225,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   well: {
     ...NO_OUTPUT,
+    category: 'utility',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -227,6 +238,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   inn: {
     ...NO_OUTPUT,
+    category: 'commerce',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -242,6 +254,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   powerPlant: {
     ...NO_OUTPUT,
+    category: 'energy',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -254,6 +267,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   researchCenter: {
     ...NO_OUTPUT,
+    category: 'science',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -267,6 +281,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   monument: {
     ...NO_OUTPUT,
+    category: 'culture',
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -276,8 +291,20 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     maxLevel: 3,
     happinessBonus: 8,
   },
+  road: {
+    ...NO_OUTPUT,
+    category: 'transport',
+    buildable: true,
+    movable: true,
+    era: 'industrial',
+    cityLevel: 1,
+    buildCost: 8,
+    upgradeBaseCost: 0,
+    maxLevel: 1,
+  },
   factory: {
     ...NO_OUTPUT,
+    category: 'industry',
     buildable: true,
     movable: true,
     era: 'industrial',

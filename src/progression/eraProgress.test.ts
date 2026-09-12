@@ -23,7 +23,7 @@ describe('era progression', () => {
 
   it('stops at the final era', () => {
     const state = createInitialState(1);
-    state.era = 'industrial';
+    state.era = 'modern';
     expect(getEraProgress(state)).toBeNull();
     expect(advanceEra(state)).toEqual({ ok: false, error: 'finalEra' });
   });

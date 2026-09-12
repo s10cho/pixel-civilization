@@ -479,8 +479,8 @@ body {
 /* Build tools sit together on one floating dock. */
 .build-bar {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
   padding: 8px;
   background: var(--ui-card);
@@ -491,6 +491,48 @@ body {
 
 .build-bar .btn {
   box-shadow: none;
+}
+
+/* Category tabs over the dock. */
+.build-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.build-bar .build-tab {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--ui-muted);
+  background: transparent;
+}
+
+.build-bar .build-tab:hover:not(:disabled) {
+  background: rgba(31, 42, 58, 0.06);
+}
+
+.build-bar .build-tab.btn-primary {
+  color: #fff;
+  background: var(--ui-accent);
+}
+
+/* A tab holding a freshly unlocked building gets a dot. */
+.build-tab.has-new:not(.btn-primary)::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: var(--ui-accent);
+}
+
+.build-dock {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
 /* --- HUD ------------------------------------------------------------------------------- */

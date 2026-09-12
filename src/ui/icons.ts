@@ -19,6 +19,7 @@ import move from 'lucide-static/icons/move.svg?raw';
 import pause from 'lucide-static/icons/pause.svg?raw';
 import play from 'lucide-static/icons/play.svg?raw';
 import plus from 'lucide-static/icons/plus.svg?raw';
+import route from 'lucide-static/icons/route.svg?raw';
 import settings from 'lucide-static/icons/settings.svg?raw';
 import smile from 'lucide-static/icons/smile.svg?raw';
 import sparkles from 'lucide-static/icons/sparkles.svg?raw';
@@ -59,6 +60,7 @@ const ICONS = {
   pause,
   play,
   plus,
+  route,
   settings,
   smile,
   sparkles,
@@ -86,6 +88,7 @@ export const BUILDING_ICONS: Record<BuildingType, IconName> = {
   powerPlant: 'zap',
   researchCenter: 'flask',
   monument: 'flag',
+  road: 'route',
   factory: 'factory',
 };
 

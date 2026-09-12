@@ -1,125 +1,82 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { BuildingType } from '../building/types';
 import type { EraId } from '../progression/era';
+import { box, cylinder, dome, merge, part, pyramid, PALETTE, type ColorKey } from './modelParts';
+import { buildFromSpec, type ModelSpec } from './modelSpec';
+import { BUILDING_SPECS, MODERN_SPECS } from './buildingSpecs';
 
-/**
- * Procedural low-poly models (1 world unit = 1 tile, origin on the tile surface). Each building
- * has a model per era, so the city visibly evolves. Models are merged into single
- * vertex-coloured geometries so each can be drawn with one InstancedMesh.
- */
-
-export const PALETTE = {
-  grass: 0x7cb85a,
-  soil: 0x8a6a45,
-  houseWall: 0xf1e3c6,
-  houseRoof: 0x4f7fc2,
-  shopWall: 0xf2c65e,
-  shopAwning: 0xd9534f,
-  hallWall: 0xe9d3a8,
-  hallRoof: 0xa0522d,
-  door: 0x6b4a2a,
-  window: 0x9fd3f0,
-  parkGrass: 0x8fcf6a,
-  trunk: 0x7a5230,
-  leaves: 0x3f8f3f,
-  leavesAlt: 0x57a846,
-  flower: 0xffd84d,
-  flag: 0xe63946,
-  skin: 0xf2c9a0,
-  pants: 0x3b3340,
-  white: 0xffffff,
-  millWall: 0xd8cfc0,
-  sail: 0xf4efe6,
-  brick: 0xb5523b,
-  brickDark: 0x7a3526,
-  roofDark: 0x4a4f5a,
-  stone: 0xbfb8aa,
-  gold: 0xf2c14e,
-  parchment: 0xe8dfc0,
-  crop: 0x9ac34a,
-  cropRipe: 0xd9b24a,
-  hay: 0xe0c069,
-  forge: 0xff7a3c,
-  glass: 0xbfe3f5,
-  thatch: 0xc9a24a,
-  mud: 0xcfb38a,
-  wood: 0x9b6b3f,
-  woodDark: 0x6e4a2b,
-  cloth: 0xe8d9b5,
-  clothRed: 0xc8553d,
-  tileRoof: 0xb0472f,
-  plaster: 0xefe6d2,
-  slate: 0x56606e,
-  concrete: 0xc9c6bf,
-  dome: 0x7aa6c2,
-  water: 0x5aa0c8,
-  iron: 0x5a5f66,
-  hedge: 0x3f7f3a,
-  path: 0xd8c9a0,
-} as const;
-
-type ColorKey = keyof typeof PALETTE;
-
-interface Placement {
-  x?: number;
-  y?: number;
-  z?: number;
-  rotX?: number;
-  scale?: number;
-}
-
-const paint = new THREE.Color();
-
-/** Transforms a primitive and colours every vertex, ready to be merged with other parts. */
-function part(geometry: THREE.BufferGeometry, color: ColorKey, at: Placement = {}): THREE.BufferGeometry {
-  if (at.scale) geometry.scale(at.scale, at.scale, at.scale);
-  if (at.rotX) geometry.rotateX(at.rotX);
-  geometry.translate(at.x ?? 0, at.y ?? 0, at.z ?? 0);
-
-  paint.setHex(PALETTE[color]);
-  const count = geometry.getAttribute('position').count;
-  const colors = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    colors[i * 3] = paint.r;
-    colors[i * 3 + 1] = paint.g;
-    colors[i * 3 + 2] = paint.b;
-  }
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return geometry;
-}
-
-const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
-const cylinder = (top: number, bottom: number, height: number, segments = 8) =>
-  new THREE.CylinderGeometry(top, bottom, height, segments);
-/** Four-sided pyramid roof whose base lines up with boxes. */
-const pyramid = (radius: number, height: number) =>
-  new THREE.ConeGeometry(radius, height, 4).rotateY(Math.PI / 4);
-const dome = (radius: number) => new THREE.SphereGeometry(radius, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2);
-
-function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  // Boxes and cylinders are indexed but polyhedra are not; mergeGeometries needs one kind.
-  const uniform = parts.map((p) => (p.index ? p.toNonIndexed() : p));
-  const merged = mergeGeometries(uniform);
-  for (const p of [...parts, ...uniform]) p.dispose();
-  if (!merged) throw new Error('Failed to merge model parts');
-  return merged;
-}
+export { PALETTE };
 
 const buildingCache = new Map<string, THREE.BufferGeometry>();
 
-/** Shared geometry for a building type at a level in an era. */
-export function getBuildingGeometry(type: BuildingType, level: number, era: EraId): THREE.BufferGeometry {
-  const key = `${type}:${level}:${era}`;
+/**
+ * Shared geometry for a building type at a level in an era. `variant` covers buildings whose
+ * shape depends on their surroundings — roads connect to their neighbours.
+ */
+export function getBuildingGeometry(
+  type: BuildingType,
+  level: number,
+  era: EraId,
+  variant = 0,
+): THREE.BufferGeometry {
+  const key = `${type}:${level}:${era}:${variant}`;
   let geometry = buildingCache.get(key);
   if (!geometry) {
-    geometry = merge(buildingParts(type, level, era));
+    geometry = merge(type === 'road' ? roadParts(variant) : buildingParts(type, level, era));
     buildingCache.set(key, geometry);
   }
   return geometry;
 }
 
+/**
+ * A paved tile that grows an arm towards every neighbouring road: `connections` is a bitmask
+ * of north, east, south and west (see world/roads.ts). Sides without a road get a kerb.
+ */
+function roadParts(connections: number): THREE.BufferGeometry[] {
+  const parts = [part(box(0.98, 0.05, 0.98), 'asphalt', { y: 0.025 })];
+  const sides = [
+    { bit: 1, x: 0, z: -1 },
+    { bit: 2, x: 1, z: 0 },
+    { bit: 4, x: 0, z: 1 },
+    { bit: 8, x: -1, z: 0 },
+  ];
+  for (const side of sides) {
+    const alongX = side.x !== 0;
+    if (connections & side.bit) {
+      // Dashes running out towards the neighbour.
+      for (const distance of [0.2, 0.38]) {
+        parts.push(
+          part(box(alongX ? 0.1 : 0.05, 0.01, alongX ? 0.05 : 0.1), 'roadLine', {
+            x: side.x * distance,
+            y: 0.055,
+            z: side.z * distance,
+          }),
+        );
+      }
+    } else {
+      parts.push(
+        part(box(alongX ? 0.1 : 0.98, 0.07, alongX ? 0.98 : 0.1), 'sidewalk', {
+          x: side.x * 0.44,
+          y: 0.035,
+          z: side.z * 0.44,
+        }),
+      );
+    }
+  }
+  // A junction gets a centre patch so the dashes do not collide.
+  const arms = sides.filter((side) => connections & side.bit).length;
+  if (arms >= 3) parts.push(part(box(0.16, 0.01, 0.16), 'roadLine', { y: 0.055 }));
+  return parts;
+}
+
+/** A plain little building, for a type with neither a hand-made model nor a spec. */
+const FALLBACK_SPEC: ModelSpec = { height: 0.4, wall: 'plaster', roof: 'gable', roofColor: 'slate' };
+
 function buildingParts(type: BuildingType, level: number, era: EraId): THREE.BufferGeometry[] {
+  // The modern city is glass, panels and gardens: those looks are described by specs.
+  if (era === 'modern') {
+    return buildFromSpec(MODERN_SPECS[type] ?? BUILDING_SPECS[type] ?? FALLBACK_SPEC, level);
+  }
   const byEra = (ancient: () => THREE.BufferGeometry[], medieval: () => THREE.BufferGeometry[], industrial: () => THREE.BufferGeometry[]) =>
     (era === 'ancient' ? ancient : era === 'medieval' ? medieval : industrial)();
 
@@ -184,6 +141,9 @@ function buildingParts(type: BuildingType, level: number, era: EraId): THREE.Buf
       return byEra(memorialStone, clockTower, observationDeck);
     case 'factory':
       return factory(level);
+    default:
+      // Buildings added after the original twelve describe themselves with a spec.
+      return buildFromSpec(BUILDING_SPECS[type] ?? FALLBACK_SPEC, level);
   }
 }
 
@@ -782,7 +742,12 @@ export function getRotor(type: BuildingType, level: number, era: EraId): Rotor |
 
 /** Chimney tops that emit smoke, relative to the building's origin. */
 export function getSmokeEmitters(type: BuildingType, level: number, era: EraId): THREE.Vector3[] {
-  if (type === 'factory') return [new THREE.Vector3(0.3, 0.35 + factoryStack(level), -0.2)];
+  if (type === 'factory') {
+    // The modern plant's stack comes from its spec, so its top sits elsewhere.
+    return era === 'modern'
+      ? [new THREE.Vector3(-0.23, 0.95 + 0.06 * level, -0.17)]
+      : [new THREE.Vector3(0.3, 0.35 + factoryStack(level), -0.2)];
+  }
   if (type === 'powerPlant' && era === 'industrial') {
     const top = 0.4 + 0.7 + 0.08 * (level - 1);
     return [new THREE.Vector3(-0.2, top, -0.15), new THREE.Vector3(0.05, top, -0.15)];

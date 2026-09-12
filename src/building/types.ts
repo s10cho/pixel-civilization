@@ -12,10 +12,42 @@ export type BuildingType =
   | 'powerPlant'
   | 'researchCenter'
   | 'monument'
+  | 'road'
   | 'factory';
+
+/** Build-menu grouping; each becomes a tab in the build bar. */
+export type BuildingCategory =
+  | 'housing'
+  | 'food'
+  | 'commerce'
+  | 'industry'
+  | 'energy'
+  | 'utility'
+  | 'transport'
+  | 'leisure'
+  | 'culture'
+  | 'science'
+  | 'civic';
+
+/** Category tabs in build-menu order. */
+export const BUILDING_CATEGORIES: readonly BuildingCategory[] = [
+  'housing',
+  'food',
+  'commerce',
+  'industry',
+  'energy',
+  'utility',
+  'transport',
+  'leisure',
+  'culture',
+  'science',
+  'civic',
+];
 
 /** Static, balance-driven description of a building type. Numbers are level-1 values. */
 export interface BuildingDefinition {
+  /** Which build-menu tab it appears under. */
+  category: BuildingCategory;
   /** Whether the player can place this type from the build menu. */
   buildable: boolean;
   /** Whether the player can relocate it (free of charge). */

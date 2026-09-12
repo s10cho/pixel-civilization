@@ -5,7 +5,14 @@ import { getResearchModifiers } from '../progression/research';
 import type { GameState } from '../simulation/gameState';
 
 /** Why a building produces more or less than its base output. */
-export type EffectKind = 'nearHomes' | 'nearPower' | 'nearPark' | 'polluted' | 'unpowered' | 'understaffed';
+export type EffectKind =
+  | 'nearHomes'
+  | 'nearPower'
+  | 'nearPark'
+  | 'nearRoad'
+  | 'polluted'
+  | 'unpowered'
+  | 'understaffed';
 
 export interface BuildingEffect {
   kind: EffectKind;
@@ -119,6 +126,12 @@ export function computeCityReport(state: GameState): CityReport {
     } else if (building.type === 'factory' && neighbours.some((n) => n.type === 'powerPlant')) {
       bonus += ADJACENCY.factoryNearPowerBonus;
       effects.push({ kind: 'nearPower', amount: ADJACENCY.factoryNearPowerBonus });
+    }
+
+    // Anything that earns gold does better on a street.
+    if (output.goldPerSecond > 0 && neighbours.some((n) => n.type === 'road')) {
+      bonus += ADJACENCY.roadGoldBonus;
+      effects.push({ kind: 'nearRoad', amount: ADJACENCY.roadGoldBonus });
     }
 
     let efficiency = 1;

@@ -1,6 +1,6 @@
 import { canUpgradeFurther, getBuildCost, getUnlockState, getUpgradeCost } from '../building/rules';
 import type { BuildingType } from '../building/types';
-import { AUTO_GROW } from '../config/balance';
+import { AUTO_GROW, BUILDINGS } from '../config/balance';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import type { CityReport } from '../economy/cityReport';
 import { getResearchStatus, hasResearchBuilding } from '../progression/research';
@@ -122,20 +122,9 @@ function neighbourScore(state: GameState, type: BuildingType, col: number, row: 
 }
 
 function countByType(state: GameState): Record<BuildingType, number> {
-  const counts: Record<BuildingType, number> = {
-    townHall: 0,
-    house: 0,
-    farm: 0,
-    shop: 0,
-    workshop: 0,
-    park: 0,
-    well: 0,
-    inn: 0,
-    powerPlant: 0,
-    researchCenter: 0,
-    monument: 0,
-    factory: 0,
-  };
+  const counts = Object.fromEntries(
+    (Object.keys(BUILDINGS) as BuildingType[]).map((type) => [type, 0]),
+  ) as Record<BuildingType, number>;
   for (const building of state.buildings) counts[building.type]++;
   return counts;
 }

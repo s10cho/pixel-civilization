@@ -13,7 +13,12 @@ export type ResearchId =
   | 'massProduction'
   | 'megaFactory'
   | 'ecoFactory'
-  | 'urbanPlanning';
+  | 'urbanPlanning'
+  | 'electronics'
+  | 'computers'
+  | 'renewables'
+  | 'automation'
+  | 'publicTransit';
 
 /** Permanent bonuses granted by completed research. Amounts are fractions (0.25 = +25%). */
 export type ResearchEffect =
@@ -135,6 +140,48 @@ export const RESEARCH: Record<ResearchId, ResearchDefinition> = {
     effects: [
       { kind: 'capacity', amount: 0.25 },
       { kind: 'happiness', amount: 5 },
+    ],
+  },
+  electronics: {
+    era: 'industrial',
+    cost: 2200,
+    points: 420,
+    requires: ['electricity'],
+    effects: [{ kind: 'research', amount: 0.3 }],
+    opensEra: 'modern',
+  },
+  computers: {
+    era: 'modern',
+    cost: 3200,
+    points: 520,
+    requires: [],
+    effects: [{ kind: 'research', amount: 0.6 }],
+  },
+  renewables: {
+    era: 'modern',
+    cost: 3600,
+    points: 560,
+    requires: [],
+    effects: [
+      { kind: 'power', amount: 0.6 },
+      { kind: 'pollution', amount: -0.3 },
+    ],
+  },
+  automation: {
+    era: 'modern',
+    cost: 4200,
+    points: 620,
+    requires: ['computers'],
+    effects: [{ kind: 'gold', building: 'factory', amount: 0.4 }],
+  },
+  publicTransit: {
+    era: 'modern',
+    cost: 3800,
+    points: 600,
+    requires: [],
+    effects: [
+      { kind: 'happiness', amount: 6 },
+      { kind: 'capacity', amount: 0.2 },
     ],
   },
 };
