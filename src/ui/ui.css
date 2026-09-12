@@ -528,6 +528,17 @@ body {
   background: var(--ui-accent);
 }
 
+.build-thumb {
+  width: 32px;
+  height: 32px;
+  margin: -4px -1px -4px -4px;
+  object-fit: contain;
+  flex: 0 0 auto;
+  /* A faint plate so pale buildings still read on a white button. */
+  background: rgba(31, 42, 58, 0.05);
+  border-radius: 9px;
+}
+
 .build-dock {
   display: flex;
   flex-wrap: wrap;

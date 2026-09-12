@@ -1083,6 +1083,7 @@ export class CityScreen implements Screen {
     return BUILDABLE_TYPES.map((type) => ({
       type,
       category: BUILDINGS[type].category,
+      era: this.state.era,
       name: buildingName(type, this.state.era),
       cost: getBuildCost(type, this.state.era),
       unlock: getUnlockState(type, this.state),

@@ -5,12 +5,16 @@ import type { TileRect } from '../world/territory';
 import { tileToWorld } from './coords';
 
 /**
- * Isometric-style camera control: pan, zoom and yaw rotation with the pitch locked.
- * Mouse: left drag pans, right drag rotates, wheel zooms. Touch: one finger pans, two fingers
- * pinch-zoom and twist.
+ * Isometric-style camera control: panning and zooming, with the angle fixed so buildings are
+ * always seen from their front. Mouse: any drag pans. Trackpad: two-finger swipe pans, pinch
+ * zooms. Touch: one finger pans, two fingers pinch-zoom.
+ *
+ * Rotation is deliberately switched off for now — it will come back together with turning
+ * individual buildings, so the two can be designed as one feature.
  */
 export class CameraRig {
   readonly controls: OrbitControls;
+  private readonly domElement: HTMLElement;
 
   constructor(
     private readonly camera: THREE.OrthographicCamera,
@@ -19,15 +23,19 @@ export class CameraRig {
     const controls = new OrbitControls(camera, domElement);
     controls.enableDamping = true;
     controls.screenSpacePanning = false;
-    controls.zoomToCursor = true;
+    controls.enableRotate = false;
+    // The wheel is handled here instead, so a trackpad swipe pans and a pinch zooms.
+    controls.enableZoom = false;
     controls.minPolarAngle = CAMERA.polarAngle;
     controls.maxPolarAngle = CAMERA.polarAngle;
     controls.minZoom = CAMERA.minZoom;
     controls.maxZoom = CAMERA.maxZoom;
-    controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
-    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+    controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
     controls.addEventListener('change', this.keepTargetInWorld);
     this.controls = controls;
+    this.domElement = domElement;
+    domElement.addEventListener('wheel', this.onWheel, { passive: false });
 
     this.placeCamera(new THREE.Vector3(), CAMERA.azimuth);
   }
@@ -77,8 +85,41 @@ export class CameraRig {
   }
 
   dispose(): void {
+    this.domElement.removeEventListener('wheel', this.onWheel);
     this.controls.removeEventListener('change', this.keepTargetInWorld);
     this.controls.dispose();
+  }
+
+  /**
+   * Trackpads send a two-finger swipe as a plain wheel event and a pinch as ctrl+wheel, so
+   * the swipe pans the city and only the pinch (or ctrl+wheel on a mouse) zooms.
+   */
+  private readonly onWheel = (event: WheelEvent): void => {
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      this.zoomBy(1 - event.deltaY * CAMERA.pinchZoomPerPixel);
+    } else {
+      this.panByPixels(event.deltaX, event.deltaY);
+    }
+  };
+
+  /** Moves the view by a screen-space offset in pixels. */
+  panByPixels(dx: number, dy: number): void {
+    const perPixel = CAMERA.wheelPanPerPixel / (CAMERA.pixelsPerTile * this.camera.zoom);
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).setY(0).normalize();
+    // "Up the screen" along the ground: away from the camera.
+    const away = this.camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
+    const offset = right.multiplyScalar(dx * perPixel).add(away.multiplyScalar(-dy * perPixel));
+    this.controls.target.add(offset);
+    this.camera.position.add(offset);
+    this.controls.update();
+  }
+
+  /** Multiplies the zoom, keeping it inside the allowed range. */
+  zoomBy(factor: number): void {
+    this.camera.zoom = THREE.MathUtils.clamp(this.camera.zoom * factor, CAMERA.minZoom, CAMERA.maxZoom);
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
   }
 
   private placeCamera(target: THREE.Vector3, azimuth: number): void {

@@ -43,9 +43,8 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
 | Action | Mouse | Touch |
 | --- | --- | --- |
 | Select / place | click | tap |
-| Pan | left drag | one-finger drag |
-| Rotate | right drag | two-finger twist |
-| Zoom | wheel | pinch |
+| Pan | drag, or a two-finger trackpad swipe | one-finger drag |
+| Zoom | pinch, or ctrl+wheel | pinch |
 | Move a building | drag it | long-press, then drag |
 | Cancel tool / open pause menu | Esc | Menu button |
 | Let the city grow by itself | Auto-grow button (top bar) | Auto-grow button (top bar) |

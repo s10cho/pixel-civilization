@@ -5,7 +5,6 @@ import { Modal } from './Modal';
 const ROWS: readonly [MessageKey, MessageKey, MessageKey][] = [
   ['help.select', 'help.selectMouse', 'help.selectTouch'],
   ['help.pan', 'help.panMouse', 'help.panTouch'],
-  ['help.rotate', 'help.rotateMouse', 'help.rotateTouch'],
   ['help.zoom', 'help.zoomMouse', 'help.zoomTouch'],
   ['help.moveBuilding', 'help.moveBuildingMouse', 'help.moveBuildingTouch'],
 ];

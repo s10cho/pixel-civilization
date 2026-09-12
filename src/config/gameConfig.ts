@@ -40,6 +40,10 @@ export const CAMERA = {
   fitHeight: 1.2,
   /** Pointer travel (screen px) before a press counts as a camera drag rather than a tap. */
   dragThresholdPx: 8,
+  /** World units panned per wheel/trackpad pixel at zoom 1. */
+  wheelPanPerPixel: 1,
+  /** Zoom change per pinch (ctrl+wheel) pixel. */
+  pinchZoomPerPixel: 0.01,
   /** Touch: holding a building this long picks it up for moving. */
   longPressMs: 450,
 } as const;

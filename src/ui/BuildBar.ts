@@ -1,5 +1,7 @@
 import { BUILDING_CATEGORIES, type BuildingCategory, type BuildingType } from '../building/types';
 import { t, tKey } from '../i18n';
+import type { EraId } from '../progression/era';
+import { buildingThumbnail } from '../render3d/thumbnails';
 import { button, el, setText } from './dom';
 import { formatAmount } from './format';
 import { BUILDING_ICONS } from './icons';
@@ -9,6 +11,8 @@ import type { UnlockState } from '../building/rules';
 export interface BuildOption {
   type: BuildingType;
   category: BuildingCategory;
+  /** Era the preview and name should show. */
+  era: EraId;
   name: string;
   cost: number;
   unlock: UnlockState;
@@ -22,6 +26,10 @@ interface Entry {
   label: HTMLElement;
   cost: HTMLElement;
   lock: HTMLElement;
+  /** Little picture of the model, when the browser can render one. */
+  preview: HTMLImageElement | null;
+  /** Era the preview was rendered for. */
+  previewEra: EraId | null;
 }
 
 /**
@@ -103,7 +111,27 @@ export class BuildBar {
     const lock = el('span', 'btn-lock');
     node.append(cost, lock);
     node.dataset.building = option.type;
-    entry = { node, label: node.querySelector('.btn-label')!, cost, lock };
+
+    // Show the building itself where possible, with the category icon as the fallback.
+    let preview: HTMLImageElement | null = null;
+    const url = buildingThumbnail(option.type, option.era);
+    if (url) {
+      preview = el('img', 'build-thumb');
+      preview.src = url;
+      preview.alt = '';
+      const icon = node.querySelector('.icon');
+      icon?.remove();
+      node.prepend(preview);
+    }
+
+    entry = {
+      node,
+      label: node.querySelector('.btn-label')!,
+      cost,
+      lock,
+      preview,
+      previewEra: preview ? option.era : null,
+    };
     this.entries.set(option.type, entry);
     return entry;
   }
@@ -111,6 +139,14 @@ export class BuildBar {
   private updateEntry(option: BuildOption): void {
     const entry = this.entries.get(option.type);
     if (!entry) return;
+    // Buildings change with the era, and so do their pictures.
+    if (entry.preview && entry.previewEra !== option.era) {
+      const url = buildingThumbnail(option.type, option.era);
+      if (url) {
+        entry.preview.src = url;
+        entry.previewEra = option.era;
+      }
+    }
     const locked = option.unlock === 'needsLevel';
     entry.node.disabled = locked;
     entry.node.classList.toggle('btn-primary', option.type === this.activeTool);
