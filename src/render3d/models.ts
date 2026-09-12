@@ -36,7 +36,7 @@ export const PALETTE = {
   roofDark: 0x4a4f5a,
   stone: 0xbfb8aa,
   gold: 0xf2c14e,
-  shrineInner: 0x6b5b95,
+  parchment: 0xe8dfc0,
   thatch: 0xc9a24a,
   mud: 0xcfb38a,
   wood: 0x9b6b3f,
@@ -147,7 +147,7 @@ function buildingParts(type: BuildingType, level: number, era: EraId): THREE.Buf
       );
     case 'researchCenter':
       return byEra(
-        () => shrine(level),
+        () => scholarsHut(level),
         () => library(level),
         () => laboratory(level),
       );
@@ -390,21 +390,23 @@ function powerStation(level: number): THREE.BufferGeometry[] {
 
 // --- Research ----------------------------------------------------------------------------
 
-function shrine(level: number): THREE.BufferGeometry[] {
-  // An open colonnade around a glowing core, crowned by a gold orb.
-  const height = 0.36 + 0.06 * (level - 1);
-  const columns = [
-    [-0.24, -0.24],
-    [0.24, -0.24],
-    [-0.24, 0.24],
-    [0.24, 0.24],
-  ].map(([x, z]) => part(cylinder(0.045, 0.05, height), 'hallWall', { x, y: 0.08 + height / 2, z }));
+function scholarsHut(level: number): THREE.BufferGeometry[] {
+  // A raised writing hut: a thatched room and an open porch with a low desk and scrolls.
+  const wall = 0.3 + 0.05 * (level - 1);
+  const floor = 0.06;
   return [
-    part(box(0.74, 0.08, 0.74), 'stone', { y: 0.04 }),
-    ...columns,
-    part(box(0.3, height * 0.7, 0.3), 'shrineInner', { y: 0.08 + height * 0.35 }),
-    part(pyramid(0.52, 0.26), 'houseRoof', { y: 0.08 + height + 0.13 }),
-    part(new THREE.OctahedronGeometry(0.06), 'gold', { y: 0.08 + height + 0.32 }),
+    part(box(0.84, floor, 0.74), 'wood', { y: floor / 2 }),
+    part(box(0.5, wall, 0.46), 'mud', { x: -0.14, y: floor + wall / 2 }),
+    part(box(0.52, 0.04, 0.48), 'woodDark', { x: -0.14, y: floor + wall }),
+    part(pyramid(0.56, 0.3).scale(1.25, 1, 1), 'thatch', { x: -0.08, y: floor + wall + 0.16 }),
+    part(cylinder(0.028, 0.032, wall, 6), 'woodDark', { x: 0.3, y: floor + wall / 2, z: 0.26 }),
+    part(cylinder(0.028, 0.032, wall, 6), 'woodDark', { x: 0.3, y: floor + wall / 2, z: -0.26 }),
+    // Low desk with a scroll and a stack of tablets.
+    part(box(0.22, 0.03, 0.34), 'wood', { x: 0.22, y: floor + 0.11 }),
+    part(box(0.03, 0.11, 0.03), 'woodDark', { x: 0.16, y: floor + 0.055, z: 0.14 }),
+    part(box(0.03, 0.11, 0.03), 'woodDark', { x: 0.16, y: floor + 0.055, z: -0.14 }),
+    part(cylinder(0.03, 0.03, 0.22, 8).rotateX(Math.PI / 2), 'parchment', { x: 0.24, y: floor + 0.15 }),
+    part(box(0.12, 0.05, 0.1), 'plaster', { x: 0.1, y: floor + 0.15, z: -0.02 }),
   ];
 }
 

@@ -15,6 +15,8 @@ export interface Preferences {
   /** A language, or 'auto' to follow the browser. */
   locale: LocalePreference;
   tutorialDone: boolean;
+  /** The how-to-play dialog is shown once, on the first city. */
+  helpSeen: boolean;
 }
 
 const STORAGE_KEY = 'pixel-civilization:preferences';
@@ -25,6 +27,7 @@ const DEFAULTS: Preferences = {
   quality: 'auto',
   locale: 'auto',
   tutorialDone: false,
+  helpSeen: false,
 };
 
 let cached: Preferences | null = null;
@@ -49,6 +52,7 @@ export function loadPreferences(): Preferences {
         ? stored.locale
         : DEFAULTS.locale,
     tutorialDone: stored.tutorialDone === true,
+    helpSeen: stored.helpSeen === true,
   };
   return cached;
 }

@@ -1124,6 +1124,33 @@ body {
   color: var(--ui-accent);
 }
 
+/* --- Help ------------------------------------------------------------------------------ */
+
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.help-table th,
+.help-table td {
+  padding: 7px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.help-table tr:first-child th {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+
+.help-table td {
+  color: var(--ui-muted);
+}
+
 /* --- Tutorial -------------------------------------------------------------------------- */
 
 #ui .tutorial-card {

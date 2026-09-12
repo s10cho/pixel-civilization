@@ -7,8 +7,8 @@ import type { EraId } from '../progression/era';
 
 /** World grid dimensions in tiles. In the 3D view one tile is one world unit. */
 export const WORLD = {
-  cols: 24,
-  rows: 24,
+  cols: 36,
+  rows: 36,
 } as const;
 
 export const SIMULATION = {

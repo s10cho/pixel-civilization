@@ -10,6 +10,7 @@ export interface MainMenuHandlers {
   onNewGame(slot: number): void;
   onLoad(slot: number): void;
   onDelete(slot: number): void;
+  onHelp?(): void;
   onSettings?(): void;
   onCredits?(): void;
 }
@@ -109,6 +110,12 @@ export class MainMenuUI {
         label: t('menu.loadGame'),
         disabled: saved.length === 0,
         onClick: () => this.setMode('load'),
+      }),
+      button({
+        icon: 'info',
+        label: t('menu.help'),
+        disabled: !this.handlers.onHelp,
+        onClick: () => this.handlers.onHelp?.(),
       }),
       button({
         icon: 'settings',

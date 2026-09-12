@@ -6,6 +6,7 @@ import type { Screen } from './Screen';
 export interface MenuScreenHandlers {
   /** Opens a city in `slot`: a loaded save, or a new city when `save` is null. */
   onStart(slot: number, save: LoadedSave | null): void;
+  onHelp?(): void;
   onSettings?(): void;
   onCredits?(): void;
 }
@@ -29,6 +30,7 @@ export class MenuScreen implements Screen {
           .then(() => this.refresh())
           .catch(() => this.ui?.showNotice(t('menu.deleteFailed')));
       },
+      onHelp: this.handlers.onHelp,
       onSettings: this.handlers.onSettings,
       onCredits: this.handlers.onCredits,
     });

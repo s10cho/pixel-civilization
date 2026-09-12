@@ -7,8 +7,9 @@ import { applyOfflineProgress } from './offline';
 function smallTown(): GameState {
   const state = createInitialState(1);
   state.resources.gold = 1000;
-  expect(placeBuilding(state, 'house', 13, 12).ok).toBe(true);
-  expect(placeBuilding(state, 'shop', 12, 13).ok).toBe(true);
+  const hall = state.buildings[0];
+  expect(placeBuilding(state, 'house', hall.col + 1, hall.row).ok).toBe(true);
+  expect(placeBuilding(state, 'shop', hall.col, hall.row + 1).ok).toBe(true);
   return state;
 }
 

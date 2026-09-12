@@ -37,6 +37,7 @@ export interface CityUIHandlers {
   onOpenMenu(): void;
   onTutorialNext(): void;
   onTutorialSkip(): void;
+  onToggleAutoGrow(): void;
 }
 
 /** Presentation state the scene pushes into the UI. */
@@ -64,6 +65,8 @@ export interface CityUIView {
   hint: string | null;
   /** The current tutorial tip, or null when there is no tutorial. */
   tutorial: TutorialView | null;
+  /** Whether the advisor is tending the city. */
+  autoGrow: boolean;
 }
 
 /** DOM overlay for the city scene. Owns no game state; renders the view it is given. */
@@ -74,6 +77,7 @@ export class CityUI {
   private readonly eraChip: HTMLButtonElement;
   private readonly eraChipLabel: HTMLElement;
   private readonly researchPanel: ResearchPanel;
+  private readonly autoGrowButton: HTMLButtonElement;
   private readonly researchButton: HTMLButtonElement;
   private readonly researchBadge = el('span', 'btn-badge');
   private readonly buildBar: BuildBar;
@@ -103,6 +107,12 @@ export class CityUI {
     const topLeft = el('div', 'top-left');
     topLeft.append(this.hud.element, this.eraChip, this.problems.element, this.researchPanel.element);
 
+    this.autoGrowButton = button({
+      icon: 'sparkles',
+      label: t('ui.autoGrow'),
+      className: 'auto-grow-button',
+      onClick: handlers.onToggleAutoGrow,
+    });
     this.researchButton = button({
       icon: 'flask',
       label: t('ui.research'),
@@ -112,6 +122,7 @@ export class CityUI {
     this.researchButton.append(this.researchBadge);
     const topRight = el('div', 'top-right');
     topRight.append(
+      this.autoGrowButton,
       this.researchButton,
       button({ icon: 'menu', label: t('ui.menu'), className: 'menu-button', onClick: handlers.onOpenMenu }),
     );
@@ -152,6 +163,9 @@ export class CityUI {
     this.hud.update(view.resources);
     this.eraChip.hidden = view.eraReady === null;
     if (view.eraReady) setText(this.eraChipLabel, t('ui.eraReady', { era: eraName(view.eraReady) }));
+    this.autoGrowButton.classList.toggle('btn-success', view.autoGrow);
+    this.autoGrowButton.setAttribute('aria-pressed', String(view.autoGrow));
+    this.autoGrowButton.title = t(view.autoGrow ? 'ui.autoGrowOn' : 'ui.autoGrowOff');
     this.problems.update(view.problems);
     this.researchPanel.update(view.research);
     this.researchButton.classList.toggle('btn-primary', view.research.open);
@@ -191,7 +205,7 @@ export class CityUI {
   }
 
   /** "Welcome back" summary of what the city produced while the player was away. */
-  showOfflineReport(report: OfflineReport): void {
+  showOfflineReport(report: OfflineReport, autoActions = 0): void {
     this.offlineModal?.close();
     const body = el('div', 'offline-report');
     body.append(el('p', 'modal-text', t('offline.away', { duration: formatDuration(report.awaySeconds) })));
@@ -205,6 +219,7 @@ export class CityUI {
       stats.append(row);
     }
     body.append(stats);
+    if (autoActions > 0) body.append(el('p', 'modal-text', t('auto.offline', { count: autoActions })));
     if (report.capped) {
       body.append(el('p', 'modal-note', t('offline.capped', { duration: formatDuration(OFFLINE.maxSeconds) })));
     }

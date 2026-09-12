@@ -49,11 +49,11 @@ export function getSpeedMultiplier(happiness: number): number {
   return slow + (fast - slow) * (clampHappiness(happiness) / 100);
 }
 
-/** Growth scales with mood, and stops entirely while citizens are unhappy (a city problem). */
+/** Growth scales with mood. Unhappy cities grow slowly, but they never stop. */
 export function getGrowthMultiplier(happiness: number): number {
-  if (happiness < PROBLEMS.lowHappinessBelow) return 0;
   const [min, max] = HAPPINESS.growthMultiplier;
-  return Math.min(max, Math.max(min, happiness / HAPPINESS.base));
+  const scaled = Math.min(max, Math.max(min, happiness / HAPPINESS.base));
+  return happiness < PROBLEMS.lowHappinessBelow ? scaled * HAPPINESS.unhappyGrowthMultiplier : scaled;
 }
 
 function clampHappiness(value: number): number {

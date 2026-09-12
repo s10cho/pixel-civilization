@@ -28,6 +28,8 @@ export interface GameState {
   research: ResearchState;
   /** Number of territory expansions purchased. */
   expansionLevel: number;
+  /** Whether the advisor tends the city on its own (see simulation/autoGrow). */
+  autoGrow: boolean;
   nextBuildingId: number;
   nextCitizenId: number;
   /** PRNG state for simulation randomness (see simulation/random.ts). */
@@ -50,6 +52,8 @@ export function createInitialState(seed: number = Date.now()): GameState {
     peakPopulation: 0,
     research: { completed: [], active: null },
     expansionLevel: 0,
+    // New cities start with the advisor on, so a first-time player always sees progress.
+    autoGrow: true,
     nextBuildingId: 1,
     nextCitizenId: 1,
     rngState: seed | 0,

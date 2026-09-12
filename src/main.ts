@@ -6,6 +6,7 @@ import type { Screen } from './screens/Screen';
 import { loadPreferences } from './storage/preferences';
 import type { LoadedSave } from './storage/saveStore';
 import { openCredits } from './ui/CreditsDialog';
+import { openHelp } from './ui/HelpDialog';
 import { getUiRoot } from './ui/dom';
 import { openSettings } from './ui/SettingsDialog';
 import './ui/ui.css';
@@ -27,6 +28,7 @@ function showMenu(): void {
   show(
     new MenuScreen(uiRoot, {
       onStart: showCity,
+      onHelp: () => openHelp(uiRoot),
       onSettings: () => openSettings(uiRoot),
       onCredits: () => openCredits(uiRoot),
     }),

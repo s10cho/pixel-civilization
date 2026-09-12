@@ -2,7 +2,7 @@ import { audio } from '../audio/AudioEngine';
 import { BUILDABLE_TYPES, getBuildCost, getUnlockState } from '../building/rules';
 import type { Building, BuildingType } from '../building/types';
 import { getOccupancy } from '../citizen/occupancy';
-import { BUILDINGS, OFFLINE } from '../config/balance';
+import { AUTO_GROW, BUILDINGS, OFFLINE } from '../config/balance';
 import { AUTO_QUALITY, CAMERA, ERA_TRANSITION, QUALITY, SAVE, SIMULATION, type QualityLevel } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
@@ -33,6 +33,7 @@ import {
   validatePlacement,
 } from '../simulation/actions';
 import { createInitialState, type GameState } from '../simulation/gameState';
+import { planAutoAction, type AutoAction } from '../simulation/autoGrow';
 import { applyOfflineProgress } from '../simulation/offline';
 import { tickSimulation } from '../simulation/tick';
 import { saveSlot, type LoadedSave } from '../storage/saveStore';
@@ -42,6 +43,7 @@ import { CityUI } from '../ui/CityUI';
 import { actionErrorText, eraErrorText, eraRequirementText, problemText, researchErrorText } from '../ui/messages';
 import { Modal } from '../ui/Modal';
 import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
+import { openHelp } from '../ui/HelpDialog';
 import { openSettings } from '../ui/SettingsDialog';
 import type { TutorialView } from '../ui/TutorialCard';
 import { loadPreferences, savePreferences, type Preferences } from '../storage/preferences';
@@ -153,6 +155,9 @@ export class CityScreen implements Screen {
   private readonly frameRate = new FrameRateMonitor();
   /** First-time guidance for a new city, while it runs. */
   private tutorial: Tutorial | null = null;
+  private helpModal: Modal | null = null;
+  /** Seconds since the advisor's last action. */
+  private autoGrowSeconds = 0;
 
   constructor(
     private readonly viewRoot: HTMLElement,
@@ -195,7 +200,16 @@ export class CityScreen implements Screen {
     this.recomputeReport();
     this.updateProblems(false);
     this.refreshUI();
-    if (offline && offline.awaySeconds >= OFFLINE.minReportSeconds) this.ui.showOfflineReport(offline);
+    if (offline && offline.awaySeconds >= OFFLINE.minReportSeconds) {
+      this.ui.showOfflineReport(offline, this.runOfflineAutoGrow(offline.creditedSeconds));
+    }
+    // A first-time player sees the controls before anything else.
+    if (!loadPreferences().helpSeen) {
+      this.helpModal = openHelp(this.uiRoot, () => {
+        savePreferences({ helpSeen: true });
+        this.helpModal = null;
+      });
+    }
     // Claim the slot right away and keep it current.
     void this.save();
     this.autosaveTimer = window.setInterval(() => void this.save(), SAVE.autosaveSeconds * 1000);
@@ -221,6 +235,7 @@ export class CityScreen implements Screen {
     window.clearInterval(this.autosaveTimer);
     this.settingsModal?.close();
     this.pauseModal?.close();
+    this.helpModal?.close();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('resize', this.onResize);
@@ -240,13 +255,21 @@ export class CityScreen implements Screen {
     // rAF timestamps can precede the performance.now() taken at mount, so never step backwards.
     const frameSeconds = Math.max(0, (now - this.lastFrame) / 1000);
     this.lastFrame = now;
-    if (!this.paused) this.accumulator += Math.min(frameSeconds, SIMULATION.maxCatchUpSeconds);
+    if (!this.paused) {
+      const step = Math.min(frameSeconds, SIMULATION.maxCatchUpSeconds);
+      this.accumulator += step;
+      if (this.state.autoGrow) this.autoGrowSeconds += step;
+    }
     if (this.autoQuality) this.adaptQuality(frameSeconds);
     let ticked = false;
     while (this.accumulator >= SIMULATION.tickSeconds) {
       this.report = tickSimulation(this.state, SIMULATION.tickSeconds);
       this.accumulator -= SIMULATION.tickSeconds;
       ticked = true;
+    }
+    while (this.state.autoGrow && this.autoGrowSeconds >= AUTO_GROW.intervalSeconds) {
+      this.autoGrowSeconds -= AUTO_GROW.intervalSeconds;
+      this.runAutoAction(true);
     }
     if (ticked) {
       this.citizens.sync(this.state.citizens);
@@ -281,6 +304,7 @@ export class CityScreen implements Screen {
         onOpenMenu: () => this.openPause(),
         onTutorialNext: () => this.advanceTutorial(),
         onTutorialSkip: () => this.finishTutorial(),
+        onToggleAutoGrow: () => this.toggleAutoGrow(),
       });
   }
 
@@ -332,7 +356,8 @@ export class CityScreen implements Screen {
    */
   private catchUp(seconds: number): void {
     if (seconds >= OFFLINE.minReportSeconds) {
-      this.ui.showOfflineReport(applyOfflineProgress(this.state, seconds));
+      const offline = applyOfflineProgress(this.state, seconds);
+      this.ui.showOfflineReport(offline, this.runOfflineAutoGrow(offline.creditedSeconds));
     } else {
       for (let t = 0; t + SIMULATION.tickSeconds <= seconds; t += SIMULATION.tickSeconds) {
         this.report = tickSimulation(this.state, SIMULATION.tickSeconds);
@@ -799,17 +824,19 @@ export class CityScreen implements Screen {
 
   private expand(): void {
     const result = expandTerritory(this.state);
-    if (result.ok) {
-      this.ground.sync(this.state, this.displayEra);
-      this.decor.sync(this.state, this.displayEra);
-      audio.play('expand');
-      // Auto focus: frame the newly unlocked territory.
-      this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
-      this.announceProgress();
-    } else {
-      this.fail(actionErrorText(result.error));
-    }
+    if (result.ok) this.onTerritoryChanged();
+    else this.fail(actionErrorText(result.error));
     this.refreshUI();
+  }
+
+  /** Redraws the map after the territory grew and frames the new land. */
+  private onTerritoryChanged(): void {
+    this.ground.sync(this.state, this.displayEra);
+    this.decor.sync(this.state, this.displayEra);
+    audio.play('expand');
+    // Auto focus: frame the newly unlocked territory.
+    this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
+    this.announceProgress();
   }
 
   private clearSelection(): void {
@@ -818,6 +845,94 @@ export class CityScreen implements Screen {
     this.markers.setSelection(null);
     this.updatePreview();
     this.refreshUI();
+  }
+
+  // --- Auto-grow ---------------------------------------------------------------------------
+
+  private toggleAutoGrow(): void {
+    this.state.autoGrow = !this.state.autoGrow;
+    this.autoGrowSeconds = 0;
+    audio.play('select');
+    this.ui.showMessage(t(this.state.autoGrow ? 'auto.enabled' : 'auto.disabled'));
+    this.refreshUI();
+  }
+
+  /** Carries out one advisor action, if it has something worth doing. */
+  private runAutoAction(announce: boolean): boolean {
+    const action = planAutoAction(this.state, this.report);
+    if (!action) return false;
+    const done = this.applyAutoAction(action, announce);
+    if (done && announce) this.refreshUI();
+    return done;
+  }
+
+  private applyAutoAction(action: AutoAction, announce: boolean): boolean {
+    const era = this.state.era;
+    switch (action.kind) {
+      case 'build': {
+        if (!placeBuilding(this.state, action.type, action.col, action.row).ok) return false;
+        this.onCityChanged();
+        if (announce) {
+          this.popBuilding(getBuildingAt(this.state, action.col, action.row)?.id);
+          audio.play('place');
+          this.ui.showMessage(t('auto.built', { building: buildingName(action.type, era) }));
+        }
+        return true;
+      }
+      case 'upgrade': {
+        const type = this.state.buildings.find((b) => b.id === action.buildingId)?.type;
+        if (!upgradeBuilding(this.state, action.buildingId).ok || !type) return false;
+        this.onCityChanged();
+        if (announce) {
+          this.popBuilding(action.buildingId);
+          audio.play('upgrade');
+          this.ui.showMessage(t('auto.upgraded', { building: buildingName(type, era) }));
+        }
+        return true;
+      }
+      case 'expand': {
+        if (!expandTerritory(this.state).ok) return false;
+        if (announce) {
+          this.onTerritoryChanged();
+          this.ui.showMessage(t('auto.expanded'));
+        }
+        return true;
+      }
+      case 'research': {
+        if (!startResearch(this.state, action.id).ok) return false;
+        if (announce) {
+          audio.play('select');
+          this.ui.showMessage(t('auto.research', { name: researchName(action.id) }));
+        }
+        return true;
+      }
+    }
+  }
+
+  /** A few advisor actions for the time the player was away, silently. */
+  private runOfflineAutoGrow(creditedSeconds: number): number {
+    if (!this.state.autoGrow) return 0;
+    const allowed = Math.min(AUTO_GROW.maxOfflineActions, Math.floor(creditedSeconds / AUTO_GROW.intervalSeconds));
+    let done = 0;
+    for (let i = 0; i < allowed; i++) {
+      this.recomputeReport();
+      if (!this.runAutoAction(false)) break;
+      done++;
+    }
+    if (done > 0) {
+      this.onCityChanged();
+      this.ground.sync(this.state, this.displayEra);
+      this.decor.sync(this.state, this.displayEra);
+    }
+    return done;
+  }
+
+  private openHelpDialog(): void {
+    if (this.helpModal?.isOpen) return;
+    this.helpModal = openHelp(this.uiRoot, () => {
+      savePreferences({ helpSeen: true });
+      this.helpModal = null;
+    });
   }
 
   // --- Pause, settings, quality, tutorial --------------------------------------------------
@@ -832,6 +947,7 @@ export class CityScreen implements Screen {
       icon: 'pause',
       body: t('pause.body'),
       actions: [
+        { label: t('menu.help'), icon: 'info', keepOpen: true, onClick: () => this.openHelpDialog() },
         { label: t('pause.settings'), icon: 'settings', keepOpen: true, onClick: () => this.openSettingsDialog() },
         { label: t('pause.saveExit'), icon: 'arrowLeft', variant: 'warning', onClick: () => this.exitToMenu() },
         { label: t('pause.resume'), icon: 'play', variant: 'primary' },
@@ -1012,6 +1128,7 @@ export class CityScreen implements Screen {
       expansionCost: getExpansionCost(this.state.expansionLevel),
       hint: this.hintText(),
       tutorial: this.tutorialView(),
+      autoGrow: this.state.autoGrow,
     });
   }
 }
