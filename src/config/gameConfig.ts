@@ -207,6 +207,8 @@ export const TRAFFIC = {
   tilesPerTrain: 4,
   /** Tiles per second. */
   carSpeed: [0.5, 0.9] as const,
+  /** How far to the right of the centre line vehicles drive, in tiles. */
+  laneOffset: 0.22,
   trainSpeed: 1.4,
   carColors: [0xf2f2f2, 0x4a6fa5, 0xc8553d, 0x3f7f5a, 0x6a6a72, 0xe0b23a] as const,
   trainColor: 0xb0472f,

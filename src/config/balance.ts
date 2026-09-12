@@ -1551,6 +1551,22 @@ export const PROJECTS: Record<ProjectKind, { cost: number; workSeconds: number; 
   railway: { cost: 900, workSeconds: 90, era: 'industrial', cityLevel: 7 },
 };
 
+/** Walking routes: citizens keep off the carriageway and cross at crossings. */
+export const PATHS = {
+  /** Tiles a single route search may look at before giving up. */
+  maxTilesSearched: 1200,
+} as const;
+
+/** Roads: how wide they can read as, and how often people can cross them. */
+export const ROADS = {
+  /** Tiles of width the markings distinguish (3 means "three or more"). */
+  maxWidth: 3,
+  /** A crossing every this many tiles along a road, plus every junction. */
+  crossingSpacing: 3,
+  /** How far along a road to look when working out which way it runs. */
+  maxRun: 6,
+} as const;
+
 /** The rocky ridges crossing the map (see world/terrain.ts). */
 export const TERRAIN = {
   ridges: 3,

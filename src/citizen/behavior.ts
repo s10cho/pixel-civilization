@@ -3,6 +3,7 @@ import { BUILDINGS, CITIZENS, HAPPINESS } from '../config/balance';
 import { getSpeedMultiplier } from '../economy/happiness';
 import type { GameState } from '../simulation/gameState';
 import { nextRandom, randomRange } from '../simulation/random';
+import { findWalkPath } from './path';
 import type { Citizen } from './types';
 
 /** Whether the citizen is outside (visible) rather than inside a home or workplace. */
@@ -61,7 +62,7 @@ function updateCitizen(
         citizen.activity = 'toHome';
         break;
       }
-      if (walkTowards(citizen, workplace.col + 0.5, workplace.row + 0.5, dt)) {
+      if (walkRoute(state, citizen, workplace.col, workplace.row, workplace.col + 0.5, workplace.row + 0.5, dt)) {
         citizen.activity = 'working';
         citizen.timer = randomRange(state, CITIZENS.workSeconds);
       }
@@ -77,7 +78,7 @@ function updateCitizen(
       }
       const x = spot.col + 0.5 + citizen.leisureOffsetX;
       const y = spot.row + 0.5 + citizen.leisureOffsetY;
-      if (walkTowards(citizen, x, y, dt)) {
+      if (walkRoute(state, citizen, spot.col, spot.row, x, y, dt)) {
         citizen.activity = 'leisure';
         citizen.timer = randomRange(state, CITIZENS.leisureSeconds);
       }
@@ -87,7 +88,7 @@ function updateCitizen(
     case 'toHome': {
       const home = buildings.get(citizen.homeId);
       // A missing home is fixed by syncCitizens on the next tick; wait in place until then.
-      if (home && walkTowards(citizen, home.col + 0.5, home.row + 0.5, dt)) {
+      if (home && walkRoute(state, citizen, home.col, home.row, home.col + 0.5, home.row + 0.5, dt)) {
         citizen.activity = 'atHome';
         citizen.timer = randomRange(state, CITIZENS.homeRestSeconds);
       }
@@ -106,6 +107,57 @@ function tryStartLeisure(state: GameState, citizen: Citizen, spots: Building[]):
   citizen.leisureOffsetY = (nextRandom(state) * 2 - 1) * CITIZENS.leisureSpreadTiles;
   citizen.activity = 'toLeisure';
   return true;
+}
+
+/**
+ * Walks the citizen along a route to the destination tile, stepping from tile to tile so they
+ * keep off the carriageway and cross at crossings. Without a route (a home ringed by roads,
+ * say) they walk straight there rather than standing still forever.
+ */
+function walkRoute(
+  state: GameState,
+  citizen: Citizen,
+  targetCol: number,
+  targetRow: number,
+  exactX: number,
+  exactY: number,
+  dt: number,
+): boolean {
+  const planned = citizen.pathTo;
+  if (!citizen.path || !planned || planned.col !== targetCol || planned.row !== targetRow) {
+    const from = { col: Math.floor(citizen.x), row: Math.floor(citizen.y) };
+    const route = findWalkPath(state, from, { col: targetCol, row: targetRow });
+    citizen.path = route ?? [];
+    citizen.pathTo = { col: targetCol, row: targetRow };
+  }
+
+  const next = citizen.path[0];
+  if (!next) {
+    const arrived = walkTowards(citizen, exactX, exactY, dt);
+    if (arrived) clearRoute(citizen);
+    return arrived;
+  }
+
+  // The last tile is the destination itself, where the exact spot matters.
+  const last = citizen.path.length === 1;
+  if (walkTowards(citizen, last ? exactX : next.col + 0.5, last ? exactY : next.row + 0.5, dt)) {
+    citizen.path.shift();
+    if (citizen.path.length === 0) {
+      clearRoute(citizen);
+      return true;
+    }
+  }
+  return false;
+}
+
+function clearRoute(citizen: Citizen): void {
+  citizen.path = undefined;
+  citizen.pathTo = undefined;
+}
+
+/** Forgets every planned route, e.g. after the streets changed. */
+export function clearRoutes(state: GameState): void {
+  for (const citizen of state.citizens) clearRoute(citizen);
 }
 
 /** Moves the citizen towards (x, y) in tile units. Returns true on arrival. */

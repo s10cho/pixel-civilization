@@ -23,4 +23,8 @@ export interface Citizen {
   y: number;
   /** Seconds left in the current stay activity (atHome / working / leisure). */
   timer: number;
+  /** Tiles left on the way to the destination; people follow this instead of a straight line. */
+  path?: { col: number; row: number }[];
+  /** The tile the current route leads to, so it is only planned once per trip. */
+  pathTo?: { col: number; row: number };
 }

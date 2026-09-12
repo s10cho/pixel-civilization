@@ -56,6 +56,7 @@ export const PALETTE = {
   path: 0xd8c9a0,
   asphalt: 0x4d4f56,
   roadLine: 0xe6e2d4,
+  roadCentre: 0xe8c34a,
   sidewalk: 0xb9b5ac,
 } as const;
 

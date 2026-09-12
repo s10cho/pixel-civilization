@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { BuildingType } from '../building/types';
 import type { EraId } from '../progression/era';
 import { box, cylinder, dome, merge, part, pyramid, PALETTE, type ColorKey } from './modelParts';
+import { unpackRoadVariant } from '../world/roads';
 import { buildFromSpec, type ModelSpec } from './modelSpec';
 import { BUILDING_SPECS, MODERN_SPECS } from './buildingSpecs';
 
@@ -29,11 +30,15 @@ export function getBuildingGeometry(
 }
 
 /**
- * A paved tile that grows an arm towards every neighbouring road: `connections` is a bitmask
- * of north, east, south and west (see world/roads.ts). Sides without a road get a kerb.
+ * A paved tile. Arms reach towards every neighbouring road, sides without one get a kerb, and
+ * the markings follow how wide the road is here: a single tile carries two lanes either side
+ * of a dashed centre line, while a wider road gets edge lines, an amber centre line and a
+ * dashed divider inside each tile. Crossings are painted with stripes instead.
  */
-function roadParts(connections: number): THREE.BufferGeometry[] {
+function roadParts(variant: number): THREE.BufferGeometry[] {
+  const lane = unpackRoadVariant(variant);
   const parts = [part(box(0.98, 0.05, 0.98), 'asphalt', { y: 0.025 })];
+
   const sides = [
     { bit: 1, x: 0, z: -1 },
     { bit: 2, x: 1, z: 0 },
@@ -41,31 +46,60 @@ function roadParts(connections: number): THREE.BufferGeometry[] {
     { bit: 8, x: -1, z: 0 },
   ];
   for (const side of sides) {
+    if (lane.mask & side.bit) continue;
     const alongX = side.x !== 0;
-    if (connections & side.bit) {
-      // Dashes running out towards the neighbour.
-      for (const distance of [0.2, 0.38]) {
-        parts.push(
-          part(box(alongX ? 0.1 : 0.05, 0.01, alongX ? 0.05 : 0.1), 'roadLine', {
-            x: side.x * distance,
-            y: 0.055,
-            z: side.z * distance,
-          }),
-        );
-      }
-    } else {
-      parts.push(
-        part(box(alongX ? 0.1 : 0.98, 0.07, alongX ? 0.98 : 0.1), 'sidewalk', {
-          x: side.x * 0.44,
-          y: 0.035,
-          z: side.z * 0.44,
-        }),
-      );
-    }
+    parts.push(
+      part(box(alongX ? 0.1 : 0.98, 0.07, alongX ? 0.98 : 0.1), 'sidewalk', {
+        x: side.x * 0.44,
+        y: 0.035,
+        z: side.z * 0.44,
+      }),
+    );
   }
-  // A junction gets a centre patch so the dashes do not collide.
-  const arms = sides.filter((side) => connections & side.bit).length;
-  if (arms >= 3) parts.push(part(box(0.16, 0.01, 0.16), 'roadLine', { y: 0.055 }));
+
+  if (lane.axis === 'junction') {
+    // Where roads meet, the markings stop and the box stays clear.
+    parts.push(part(box(0.16, 0.01, 0.16), 'roadLine', { y: 0.055 }));
+    return parts;
+  }
+
+  const alongX = lane.axis === 'x';
+  /** Paints a marking `along` the direction of travel and `across` it. */
+  const mark = (
+    colour: ColorKey,
+    length: number,
+    thickness: number,
+    alongPos: number,
+    acrossPos: number,
+  ): void => {
+    parts.push(
+      part(box(alongX ? length : thickness, 0.012, alongX ? thickness : length), colour, {
+        x: alongX ? alongPos : acrossPos,
+        y: 0.056,
+        z: alongX ? acrossPos : alongPos,
+      }),
+    );
+  };
+
+  if (lane.crossing) {
+    // Zebra stripes: the place to cross on foot.
+    for (const offset of [-0.32, -0.16, 0, 0.16, 0.32]) mark('roadLine', 0.1, 0.76, offset, 0);
+    return parts;
+  }
+
+  if (lane.width <= 1) {
+    for (const offset of [-0.3, 0, 0.3]) mark('roadLine', 0.22, 0.05, offset, 0);
+    return parts;
+  }
+
+  // Two lanes on this tile, divided by dashes.
+  for (const offset of [-0.3, 0, 0.3]) mark('roadLine', 0.2, 0.04, offset, 0);
+  if (lane.index === 0) mark('roadLine', 0.98, 0.04, 0, -0.42);
+  if (lane.index === lane.width - 1) mark('roadLine', 0.98, 0.04, 0, 0.42);
+  // The middle of the road: painted by the tile just inside it, so it is drawn once.
+  if (lane.index === Math.floor((lane.width - 1) / 2) && lane.index < lane.width - 1) {
+    mark('roadCentre', 0.98, 0.07, 0, 0.48);
+  }
   return parts;
 }
 

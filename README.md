@@ -16,7 +16,9 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
   space centers. Citizens are simulated: they move in, walk to work and to parks, and show
   their mood.
 - **Roads**: cheap paving that connects to its neighbours, with trade and industry beside it
-  earning more.
+  earning more. Markings follow how wide the road is — a single tile has a dashed centre line,
+  a wider one gets edge lines and an amber centre — cars keep to the right-hand lane, and people
+  cross at the zebra crossings instead of walking into the traffic.
 - **City management**: power supply and demand, staffing, adjacency bonuses (shops next to
   homes, parks around homes, factories near power), pollution and happiness. Problems are
   flagged in the HUD and tapping one focuses the camera on it.

@@ -34,6 +34,7 @@ export class TrafficView {
   private readonly rotation = new THREE.Quaternion();
   private readonly scale = new THREE.Vector3(1, 1, 1);
   private readonly up = new THREE.Vector3(0, 1, 0);
+  private readonly lane = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -99,7 +100,14 @@ export class TrafficView {
       const from = tileToWorld(vehicle.col, vehicle.row);
       const to = tileToWorld(vehicle.nextCol, vehicle.nextRow);
       this.position.lerpVectors(from, to, vehicle.t);
-      const heading = Math.atan2(to.x - from.x, to.z - from.z);
+      // Cars keep right, half a road over from the centre line; trains run down their rails.
+      const dx = to.x - from.x;
+      const dz = to.z - from.z;
+      if (!vehicle.rail && (dx !== 0 || dz !== 0)) {
+        this.lane.set(-dz, 0, dx).normalize().multiplyScalar(TRAFFIC.laneOffset);
+        this.position.add(this.lane);
+      }
+      const heading = Math.atan2(dx, dz);
       this.rotation.setFromAxisAngle(this.up, heading);
       this.matrix.compose(this.position, this.rotation, this.scale);
 

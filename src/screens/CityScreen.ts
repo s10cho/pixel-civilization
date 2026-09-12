@@ -1,6 +1,7 @@
 import { audio } from '../audio/AudioEngine';
 import { BUILDABLE_TYPES, getBuildCost, getUnlockState } from '../building/rules';
 import type { Building, BuildingType } from '../building/types';
+import { clearRoutes } from '../citizen/behavior';
 import { getOccupancy } from '../citizen/occupancy';
 import {
   AUTO_GROW,
@@ -78,7 +79,7 @@ import type { TutorialView } from '../ui/TutorialCard';
 import { loadPreferences, savePreferences, type Preferences } from '../storage/preferences';
 import { Tutorial, TUTORIAL_STEPS, type TutorialEvent } from '../tutorial/tutorial';
 import { getBuildingAt } from '../world/placement';
-import { roadConnections } from '../world/roads';
+import { packRoadVariant, roadLane } from '../world/roads';
 import { isMountain } from '../world/terrain';
 import {
   canExpand,
@@ -175,9 +176,9 @@ export class CityScreen implements Screen {
     // Mid-transition every building shows its old self; afterwards, kept quarters stay old.
     this.eraOverrides.get(building.id) ??
     (building.heritage ? (building.builtEra ?? this.state.era) : this.state.era);
-  /** Roads take their shape from the roads around them. */
+  /** Roads take their shape and lanes from the roads around them. */
   private readonly variantOf = (building: Building): number =>
-    building.type === 'road' ? roadConnections(this.state, building.col, building.row) : 0;
+    building.type === 'road' ? packRoadVariant(roadLane(this.state, building.col, building.row)) : 0;
 
   private activeTool: BuildingType | null = null;
   private movingBuildingId: number | null = null;
@@ -673,6 +674,8 @@ export class CityScreen implements Screen {
 
   /** After the player changes the city: redraw and re-evaluate effects immediately. */
   private onCityChanged(): void {
+    // The streets may have moved: let everyone find their way again.
+    clearRoutes(this.state);
     this.syncBuildings();
     this.recomputeReport();
     this.updateProblems(true);
