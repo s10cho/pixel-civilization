@@ -14,6 +14,7 @@ import hammer from 'lucide-static/icons/hammer.svg?raw';
 import home from 'lucide-static/icons/house.svg?raw';
 import info from 'lucide-static/icons/info.svg?raw';
 import building from 'lucide-static/icons/landmark.svg?raw';
+import lightbulb from 'lucide-static/icons/lightbulb.svg?raw';
 import menu from 'lucide-static/icons/menu.svg?raw';
 import move from 'lucide-static/icons/move.svg?raw';
 import pause from 'lucide-static/icons/pause.svg?raw';
@@ -56,6 +57,7 @@ const ICONS = {
   hammer,
   home,
   info,
+  lightbulb,
   menu,
   move,
   pause,

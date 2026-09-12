@@ -51,6 +51,7 @@ export function advanceEra(state: GameState): { ok: true; era: EraId } | { ok: f
   if (!progress.ready) return { ok: false, error: 'requirementsNotMet' };
 
   state.era = progress.next;
+  state.eraHistory.push({ era: progress.next, at: Date.now() });
   gainXp(state, PROGRESSION.xp.era);
   return { ok: true, era: progress.next };
 }

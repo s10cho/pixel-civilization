@@ -15,7 +15,7 @@ import { BuildingPanel, type CityInfo } from './BuildingPanel';
 import { button, el, setText } from './dom';
 import { formatAmount, formatDuration } from './format';
 import { Hud } from './Hud';
-import { icon } from './icons';
+import { icon, type IconName } from './icons';
 import { Modal } from './Modal';
 import { ProblemsBar } from './ProblemsBar';
 import { ResearchPanel, type ResearchPanelView } from './ResearchPanel';
@@ -39,6 +39,7 @@ export interface CityUIHandlers {
   onTutorialSkip(): void;
   onToggleAutoGrow(): void;
   onOpenAchievements(): void;
+  onOpenConsulting(): void;
 }
 
 /** Presentation state the scene pushes into the UI. */
@@ -68,6 +69,8 @@ export interface CityUIView {
   tutorial: TutorialView | null;
   /** How much the advisor is doing (see config/balance AUTO_LEVELS). */
   autoLevel: AutoLevel;
+  /** How many things the consulting service would mention. */
+  adviceCount: number;
 }
 
 /** DOM overlay for the city scene. Owns no game state; renders the view it is given. */
@@ -80,6 +83,8 @@ export class CityUI {
   private readonly researchPanel: ResearchPanel;
   private readonly autoGrowButton: HTMLButtonElement;
   private readonly achievementsButton: HTMLButtonElement;
+  private readonly consultingButton: HTMLButtonElement;
+  private readonly consultingBadge = el('span', 'btn-badge');
   private readonly researchButton: HTMLButtonElement;
   private readonly researchBadge = el('span', 'btn-badge');
   private readonly buildBar: BuildBar;
@@ -115,6 +120,13 @@ export class CityUI {
       className: 'auto-grow-button',
       onClick: handlers.onToggleAutoGrow,
     });
+    this.consultingButton = button({
+      icon: 'lightbulb',
+      label: t('ui.consulting'),
+      className: 'consulting-button',
+      onClick: handlers.onOpenConsulting,
+    });
+    this.consultingButton.append(this.consultingBadge);
     this.achievementsButton = button({
       icon: 'trophy',
       label: t('ui.achievements'),
@@ -131,6 +143,7 @@ export class CityUI {
     const topRight = el('div', 'top-right');
     topRight.append(
       this.autoGrowButton,
+      this.consultingButton,
       this.achievementsButton,
       this.researchButton,
       button({ icon: 'menu', label: t('ui.menu'), className: 'menu-button', onClick: handlers.onOpenMenu }),
@@ -179,6 +192,8 @@ export class CityUI {
     this.autoGrowButton.title = advising
       ? `${t('ui.autoGrowOn')} · ${tKey(`settings.auto.${view.autoLevel}`)}`
       : t('ui.autoGrowOff');
+    this.consultingBadge.hidden = view.adviceCount === 0;
+    if (view.adviceCount > 0) setText(this.consultingBadge, String(view.adviceCount));
     this.problems.update(view.problems);
     this.researchPanel.update(view.research);
     this.researchButton.classList.toggle('btn-primary', view.research.open);
@@ -218,15 +233,17 @@ export class CityUI {
   }
 
   /** "Welcome back" summary of what the city produced while the player was away. */
-  showOfflineReport(report: OfflineReport, autoActions = 0): void {
+  showOfflineReport(report: OfflineReport, autoActions = 0, newBuildings = 0): void {
     this.offlineModal?.close();
     const body = el('div', 'offline-report');
     body.append(el('p', 'modal-text', t('offline.away', { duration: formatDuration(report.awaySeconds) })));
     const stats = el('div', 'offline-stats');
-    for (const [iconName, value, label] of [
+    const lines: [IconName, number, string][] = [
       ['coins', report.gold, t('offline.gold')],
       ['users', report.population, t('offline.citizens')],
-    ] as const) {
+    ];
+    if (newBuildings > 0) lines.push(['building', newBuildings, t('offline.buildings')]);
+    for (const [iconName, value, label] of lines) {
       const row = el('div', 'offline-stat');
       row.append(icon(iconName), el('strong', 'offline-value', `+${formatAmount(value)}`), el('span', '', label));
       stats.append(row);

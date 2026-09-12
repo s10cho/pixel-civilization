@@ -17,6 +17,14 @@ export function migrateState(version: number, raw: unknown): GameState {
   if (!stored || !Array.isArray(stored.buildings) || !stored.resources) {
     throw new SaveFormatError('Save data is damaged');
   }
+  // v2 saves have no history: treat the load as the city's beginning, which is the best
+  // guess available, so the comparison starts from here rather than lying about the past.
+  if (!Array.isArray(stored.eraHistory) || stored.eraHistory.length === 0) {
+    const now = Date.now();
+    stored.foundedAt = typeof stored.foundedAt === 'number' ? stored.foundedAt : now;
+    stored.eraHistory = [{ era: stored.era ?? 'ancient', at: stored.foundedAt }];
+  }
+
   // v1 had a single on/off advisor flag; v2 has levels and a growth pace.
   const legacy = stored as { autoGrow?: boolean };
   if (version < 2 && stored.autoLevel === undefined) {

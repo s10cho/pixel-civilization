@@ -1526,6 +1526,29 @@ export const TERRITORY = {
   expansionCostGrowth: 1.9,
 } as const;
 
+/**
+ * "AI consulting" (AI 컨설팅): the thresholds it reads the city by, and how many options it
+ * offers. It only ever suggests — the player decides (Phase 2 §6).
+ */
+export const CONSULTING = {
+  /** Homes are "full" at this share of capacity. */
+  housingFullShare: 0.8,
+  /** Jobs wanted per citizen. */
+  jobsPerCitizen: 0.8,
+  parksPerHouse: 0.2,
+  /** Below this happiness it suggests something cheerful. */
+  happinessBelow: 62,
+  /** Free tiles at which it starts talking about more land. */
+  roomRunningOutTiles: 8,
+  /** Gold sitting unused that is worth mentioning. */
+  idleGold: 2000,
+  /** Candidate places offered per kind of plan. */
+  candidateSpots: 3,
+  /** Minimum distance between two candidates, in tiles. */
+  spotSpacing: 4,
+  maxProposals: 4,
+} as const;
+
 /** Thank-you gold for reaching an achievement. Small enough to stay a nice surprise. */
 export const ACHIEVEMENTS_REWARD = {
   small: 25,

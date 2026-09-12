@@ -35,6 +35,12 @@ export interface GameState {
   growthPace: GrowthPace;
   nextBuildingId: number;
   nextCitizenId: number;
+  /** When the city was founded, in epoch milliseconds. */
+  foundedAt: number;
+  /** When each era began, oldest first (Phase 2 §9-10: the city keeps its history). */
+  eraHistory: { era: EraId; at: number }[];
+  /** What the city looked like when the player last left it, for the welcome-back summary. */
+  lastSeen: { at: number; population: number; buildings: number; gold: number } | null;
   /** Achievements the city has reached (see progression/achievements.ts). */
   achievements: AchievementId[];
   /** Seconds until the next happy event (see simulation/events.ts). */
@@ -62,6 +68,9 @@ export function createInitialState(seed: number = Date.now()): GameState {
     // New cities start with the advisor on, so a first-time player always sees progress.
     autoLevel: 'medium',
     growthPace: 'standard',
+    foundedAt: Date.now(),
+    eraHistory: [{ era: 'ancient', at: Date.now() }],
+    lastSeen: null,
     achievements: [],
     nextEventSeconds: EVENTS.intervalSeconds[0],
     nextBuildingId: 1,

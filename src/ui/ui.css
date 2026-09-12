@@ -1268,6 +1268,94 @@ body {
   color: var(--ui-muted);
 }
 
+/* --- AI consulting --------------------------------------------------------------------- */
+
+.advice-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.advice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: rgba(31, 42, 58, 0.04);
+  border-radius: 12px;
+}
+
+.advice-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--ui-gold);
+}
+
+.advice-text {
+  flex: 1;
+}
+
+.proposal {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: var(--ui-accent-soft);
+  border-radius: 14px;
+}
+
+.proposal-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-weight: 750;
+}
+
+.proposal-candidate {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-accent);
+}
+
+.proposal-detail {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ui-muted);
+}
+
+.proposal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* --- City history ---------------------------------------------------------------------- */
+
+.history-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.history-table .history-now {
+  font-weight: 700;
+  color: var(--ui-text);
+}
+
+.history-eras {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ui-muted);
+}
+
+.history-eras li {
+  margin: 3px 0;
+}
+
 /* --- Tutorial -------------------------------------------------------------------------- */
 
 #ui .tutorial-card {

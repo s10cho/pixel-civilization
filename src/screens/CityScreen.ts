@@ -5,12 +5,15 @@ import { getOccupancy } from '../citizen/occupancy';
 import { AUTO_GROW, AUTO_LEVELS, BUILDINGS, GROWTH_PACE, OFFLINE, type AutoLevel } from '../config/balance';
 import { AUTO_QUALITY, CAMERA, ERA_TRANSITION, QUALITY, SAVE, SIMULATION, type QualityLevel } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
+import { getAdvice } from '../consulting/advice';
+import { applyProposal, getProposals, type Proposal } from '../consulting/proposals';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
 import { t, tKey } from '../i18n';
 import { buildingName, eraName, eraTagline, researchDescription, researchName } from '../i18n/names';
 import { detectProblems, type CityProblem, type ProblemKind } from '../economy/problems';
 import type { EraId } from '../progression/era';
 import { checkAchievements, getAchievements, type AchievementUnlock } from '../progression/achievements';
+import { getCityHistory } from '../progression/cityHistory';
 import { advanceEra, getEraProgress, type EraProgress } from '../progression/eraProgress';
 import { isMaxLevel, unlocksAtLevel, xpToNextLevel } from '../progression/level';
 import { getResearchStatus, hasResearchBuilding, startResearch } from '../progression/research';
@@ -48,6 +51,8 @@ import { Modal } from '../ui/Modal';
 import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
 import { openAchievements } from '../ui/AchievementsDialog';
 import { openHelp } from '../ui/HelpDialog';
+import { openConsulting } from '../ui/ConsultingDialog';
+import { openHistory } from '../ui/HistoryDialog';
 import { openSettings } from '../ui/SettingsDialog';
 import type { TutorialView } from '../ui/TutorialCard';
 import { loadPreferences, savePreferences, type Preferences } from '../storage/preferences';
@@ -168,6 +173,8 @@ export class CityScreen implements Screen {
   private tutorial: Tutorial | null = null;
   private helpModal: Modal | null = null;
   private achievementsModal: Modal | null = null;
+  private historyModal: Modal | null = null;
+  private consultingModal: Modal | null = null;
   /** Seconds since the advisor's last action. */
   private autoGrowSeconds = 0;
   /** The level the top-bar button switches back to. */
@@ -211,12 +218,15 @@ export class CityScreen implements Screen {
     this.seenResearchCount = this.state.research.completed.length;
     // A resumed city earns resources for the time it was closed.
     const save = this.options.save;
+    const seenBuildings = this.state.lastSeen?.buildings ?? null;
     const offline = save ? applyOfflineProgress(this.state, (Date.now() - save.savedAt) / 1000) : null;
     this.recomputeReport();
     this.updateProblems(false);
     this.refreshUI();
     if (offline && offline.awaySeconds >= OFFLINE.minReportSeconds) {
-      this.ui.showOfflineReport(offline, this.runOfflineAutoGrow(offline.creditedSeconds));
+      const actions = this.runOfflineAutoGrow(offline.creditedSeconds);
+      const built = seenBuildings === null ? 0 : this.state.buildings.length - seenBuildings;
+      this.ui.showOfflineReport(offline, actions, built);
     }
     // A first-time player sees the controls before anything else.
     if (!loadPreferences().helpSeen) {
@@ -252,6 +262,8 @@ export class CityScreen implements Screen {
     this.pauseModal?.close();
     this.helpModal?.close();
     this.achievementsModal?.close();
+    this.historyModal?.close();
+    this.consultingModal?.close();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('resize', this.onResize);
@@ -325,6 +337,7 @@ export class CityScreen implements Screen {
         onTutorialSkip: () => this.finishTutorial(),
         onToggleAutoGrow: () => this.toggleAutoGrow(),
         onOpenAchievements: () => this.openAchievementsDialog(),
+        onOpenConsulting: () => this.openConsultingDialog(),
       });
   }
 
@@ -339,6 +352,13 @@ export class CityScreen implements Screen {
 
   /** Queues a save of the current state to this city's slot. */
   private save(): Promise<void> {
+    // Snapshot for the welcome-back summary next time.
+    this.state.lastSeen = {
+      at: Date.now(),
+      population: Math.floor(this.state.resources.population),
+      buildings: this.state.buildings.length,
+      gold: Math.floor(this.state.resources.gold),
+    };
     this.saving = this.saving
       .then(() => saveSlot(this.options.slot, this.state))
       .catch(() => {
@@ -681,6 +701,59 @@ export class CityScreen implements Screen {
       if (index === 0) this.ui.showMessage(text);
       else window.setTimeout(() => this.ui.showMessage(text), index * ACHIEVEMENT_TOAST_GAP_MS);
     });
+  }
+
+  /** AI consulting: what the city looks like from outside, and a few plans to choose from. */
+  private openConsultingDialog(): void {
+    if (this.consultingModal?.isOpen) return;
+    audio.play('select');
+    this.consultingModal = openConsulting(
+      this.uiRoot,
+      {
+        advice: getAdvice(this.state, this.report),
+        proposals: getProposals(this.state, this.report),
+        era: this.state.era,
+        gold: this.state.resources.gold,
+      },
+      {
+        onShow: (focus) => {
+          this.consultingModal?.close();
+          this.rig.focusTile(focus.col, focus.row);
+          this.select(focus);
+        },
+        onApply: (proposal) => this.acceptProposal(proposal),
+      },
+    );
+  }
+
+  /** Carries out a plan the player accepted. */
+  private acceptProposal(proposal: Proposal): void {
+    this.consultingModal?.close();
+    if (this.state.resources.gold < proposal.cost) {
+      this.fail(t('consult.tooExpensive'));
+      return;
+    }
+    const result = applyProposal(this.state, proposal);
+    if (result.expanded) {
+      this.onTerritoryChanged();
+      this.ui.showMessage(t('consult.expanded'));
+    }
+    if (result.built > 0) {
+      this.onCityChanged();
+      for (const step of proposal.steps) {
+        this.popBuilding(getBuildingAt(this.state, step.col, step.row)?.id);
+      }
+      audio.play('place');
+      this.ui.showMessage(t('consult.done', { count: result.built }));
+      if (proposal.anchor) this.rig.focusTile(proposal.anchor.col, proposal.anchor.row);
+    }
+    this.refreshUI();
+  }
+
+  private openHistoryDialog(): void {
+    if (this.historyModal?.isOpen) return;
+    audio.play('select');
+    this.historyModal = openHistory(this.uiRoot, getCityHistory(this.state));
   }
 
   private openAchievementsDialog(): void {
@@ -1031,6 +1104,7 @@ export class CityScreen implements Screen {
       icon: 'pause',
       body: t('pause.body'),
       actions: [
+        { label: t('history.title'), icon: 'clock', keepOpen: true, onClick: () => this.openHistoryDialog() },
         { label: t('menu.help'), icon: 'info', keepOpen: true, onClick: () => this.openHelpDialog() },
         { label: t('pause.settings'), icon: 'settings', keepOpen: true, onClick: () => this.openSettingsDialog() },
         { label: t('pause.saveExit'), icon: 'arrowLeft', variant: 'warning', onClick: () => this.exitToMenu() },
@@ -1219,6 +1293,7 @@ export class CityScreen implements Screen {
       hint: this.hintText(),
       tutorial: this.tutorialView(),
       autoLevel: this.state.autoLevel,
+      adviceCount: getAdvice(this.state, this.report).length,
     });
   }
 }

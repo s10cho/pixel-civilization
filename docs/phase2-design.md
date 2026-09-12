@@ -37,8 +37,9 @@ The three pleasures to protect, in order:
 - **The first release is deliberately easy.** None of these may happen in the default pace:
   broke and stuck, blackout stopping the city, a misplaced building blocking progress, a
   research order that dead-ends, roads that trap citizens. Every mistake is recoverable.
-- **AI helps, it does not play.** Analysis -> options -> the player chooses -> automatic
-  execution.
+- **AI helps, it does not play.** "AI consulting" (AI 컨설팅) is the name for this: analysis ->
+  options -> the player chooses -> automatic execution. The always-on part that builds small
+  things by itself keeps its own name, auto-grow (자동 성장).
 - **Don't erase the past.** Later eras leave some quarters as they were: an old town, the old
   market street, the first industrial district. (No religious buildings, ever.)
 - **The city remembers.** Long-lived places earn small notes: "this is where the village
@@ -50,7 +51,7 @@ The three pleasures to protect, in order:
 | --- | --- | --- |
 | A | Growth pace (relaxed/standard/fast) and automation level (off/low/medium/high) | §3, §7 |
 | B | Growth feedback: city history against day one, and a "since your last visit" summary | §9 |
-| C | The advisor: small advice, three-candidate proposals, city-scale plans | §6, §8 |
+| C | AI consulting: small advice, three-candidate proposals, city-scale plans | §6, §8 |
 | D | Macro decisions: choosing the direction the territory grows, large projects | §1.3, §8 |
 | E | Keeping the past: districts that stay in an older era's clothes | §11 |
 | F | Milestones: gentle long-term goals (1,000 citizens, first railway, 10,000 tiles) | §12 |
