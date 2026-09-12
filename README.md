@@ -28,14 +28,18 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
 - **Saves**: three IndexedDB save slots with autosave. Time away is credited for up to 8 hours
   (resources only).
 - **Auto-grow**: an optional advisor tends the city on its own — slower than you, always
-  leaving gold to spend — so the city keeps growing a little between visits.
+  leaving gold to spend — so the city keeps growing a little between visits. Its level is up to
+  you: off, advice only, small things automatic, or mostly self-tending. Widening the territory
+  and entering an era stay your decisions.
+- **Growth pace**: Relaxed, Standard or Fast. Pace changes speed only — nothing can fail or be
+  lost at any setting (see `docs/phase2-design.md`).
 - **Achievements**: nineteen gentle milestones with progress bars and small gold rewards.
 - **Small gifts**: a traveling merchant, a good harvest, a village festival or a wandering
   scholar drops by now and then. No event ever sets the city back.
 - **Languages**: English and Korean, following the browser by default and switchable in
   Settings.
-- **Settings**: music and effect volume, language, graphics quality (Auto adapts to the frame
-  rate).
+- **Settings**: music and effect volume, growth pace, auto-grow level, language, graphics
+  quality (Auto adapts to the frame rate).
 - First-time how-to-play card, tutorial, pause menu, PC and mobile layouts.
 
 ## Controls

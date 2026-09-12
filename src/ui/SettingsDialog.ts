@@ -1,4 +1,5 @@
 import { audio } from '../audio/AudioEngine';
+import type { AutoLevel, GrowthPace } from '../config/balance';
 import { LOCALE_NAMES, LOCALES, resolveLocale, setLocale, t, type LocalePreference, type MessageKey } from '../i18n';
 import { loadPreferences, savePreferences, type Preferences } from '../storage/preferences';
 import { el } from './dom';
@@ -11,9 +12,24 @@ const QUALITY_OPTIONS: readonly [Preferences['quality'], MessageKey][] = [
   ['low', 'settings.quality.low'],
 ];
 
+const PACE_OPTIONS: readonly [GrowthPace, MessageKey][] = [
+  ['relaxed', 'settings.pace.relaxed'],
+  ['standard', 'settings.pace.standard'],
+  ['fast', 'settings.pace.fast'],
+];
+
+const AUTO_OPTIONS: readonly [AutoLevel, MessageKey][] = [
+  ['off', 'settings.auto.off'],
+  ['low', 'settings.auto.low'],
+  ['medium', 'settings.auto.medium'],
+  ['high', 'settings.auto.high'],
+];
+
 export interface SettingsOptions {
   /** Called when the graphics quality setting changes (a running city applies it live). */
   onQualityChange?(quality: Preferences['quality']): void;
+  /** Called when the growth pace or automation level changes. */
+  onPaceChange?(): void;
   onClose?(): void;
 }
 
@@ -52,6 +68,25 @@ export function openSettings(root: HTMLElement, options: SettingsOptions = {}): 
     ...LOCALES.map((locale): [LocalePreference, string] => [locale, LOCALE_NAMES[locale]]),
   ];
   body.append(
+    select(
+      t('settings.pace'),
+      PACE_OPTIONS.map(([value, key]): [GrowthPace, string] => [value, t(key)]),
+      preferences.growthPace,
+      (value) => {
+        savePreferences({ growthPace: value });
+        options.onPaceChange?.();
+      },
+    ),
+    select(
+      t('settings.autoLevel'),
+      AUTO_OPTIONS.map(([value, key]): [AutoLevel, string] => [value, t(key)]),
+      preferences.autoLevel,
+      (value) => {
+        savePreferences({ autoLevel: value });
+        options.onPaceChange?.();
+      },
+    ),
+    el('p', 'modal-note', t('settings.paceNote')),
     select(t('settings.language'), languageOptions, preferences.locale, (value) => {
       savePreferences({ locale: value });
       setLocale(resolveLocale(value));

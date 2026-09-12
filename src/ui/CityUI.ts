@@ -1,8 +1,8 @@
 import type { Building, BuildingType } from '../building/types';
 import type { Occupancy } from '../citizen/occupancy';
-import { OFFLINE } from '../config/balance';
+import { OFFLINE, type AutoLevel } from '../config/balance';
 import { ERA_TRANSITION } from '../config/gameConfig';
-import { t } from '../i18n';
+import { t, tKey } from '../i18n';
 import { eraName } from '../i18n/names';
 import type { ResearchId } from '../config/research';
 import type { BuildingReport } from '../economy/cityReport';
@@ -66,8 +66,8 @@ export interface CityUIView {
   hint: string | null;
   /** The current tutorial tip, or null when there is no tutorial. */
   tutorial: TutorialView | null;
-  /** Whether the advisor is tending the city. */
-  autoGrow: boolean;
+  /** How much the advisor is doing (see config/balance AUTO_LEVELS). */
+  autoLevel: AutoLevel;
 }
 
 /** DOM overlay for the city scene. Owns no game state; renders the view it is given. */
@@ -172,9 +172,13 @@ export class CityUI {
     this.hud.update(view.resources);
     this.eraChip.hidden = view.eraReady === null;
     if (view.eraReady) setText(this.eraChipLabel, t('ui.eraReady', { era: eraName(view.eraReady) }));
-    this.autoGrowButton.classList.toggle('btn-success', view.autoGrow);
-    this.autoGrowButton.setAttribute('aria-pressed', String(view.autoGrow));
-    this.autoGrowButton.title = t(view.autoGrow ? 'ui.autoGrowOn' : 'ui.autoGrowOff');
+    const advising = view.autoLevel !== 'off';
+    this.autoGrowButton.classList.toggle('btn-success', advising);
+    this.autoGrowButton.setAttribute('aria-pressed', String(advising));
+    // The tooltip names the level, so the button and Settings always agree.
+    this.autoGrowButton.title = advising
+      ? `${t('ui.autoGrowOn')} · ${tKey(`settings.auto.${view.autoLevel}`)}`
+      : t('ui.autoGrowOff');
     this.problems.update(view.problems);
     this.researchPanel.update(view.research);
     this.researchButton.classList.toggle('btn-primary', view.research.open);

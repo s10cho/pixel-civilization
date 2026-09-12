@@ -1,7 +1,7 @@
 import { createInitialState, type GameState } from '../simulation/gameState';
 
 /** Bump when the saved GameState shape changes, and add a step to `migrateState`. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export class SaveFormatError extends Error {}
 
@@ -17,7 +17,11 @@ export function migrateState(version: number, raw: unknown): GameState {
   if (!stored || !Array.isArray(stored.buildings) || !stored.resources) {
     throw new SaveFormatError('Save data is damaged');
   }
-  // Future versions: `if (version < 2) { ...transform stored... }`
+  // v1 had a single on/off advisor flag; v2 has levels and a growth pace.
+  const legacy = stored as { autoGrow?: boolean };
+  if (version < 2 && stored.autoLevel === undefined) {
+    stored.autoLevel = legacy.autoGrow === false ? 'off' : 'medium';
+  }
 
   const base = createInitialState();
   return {

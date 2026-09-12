@@ -1,6 +1,6 @@
 import { canUpgradeFurther, getBuildCost, getUnlockState, getUpgradeCost } from '../building/rules';
 import type { BuildingType } from '../building/types';
-import { AUTO_GROW, BUILDINGS } from '../config/balance';
+import { AUTO_GROW, AUTO_LEVELS, BUILDINGS } from '../config/balance';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import type { CityReport } from '../economy/cityReport';
 import { getResearchStatus, hasResearchBuilding } from '../progression/research';
@@ -19,9 +19,14 @@ export type AutoAction =
  * The "auto-grow" advisor: a calm, deliberately slow player. It keeps the city balanced
  * (power, homes, jobs, a little greenery), never spends the player's whole purse and never
  * builds factories — their smoke is a choice the player should make.
+ *
+ * What it may touch depends on the automation level: small things are automatic, while
+ * widening the territory stays a player decision except at the highest level.
  */
 export function planAutoAction(state: GameState, report: CityReport): AutoAction | null {
-  const budget = state.resources.gold * (1 - AUTO_GROW.goldReserve);
+  const permissions = AUTO_LEVELS[state.autoLevel];
+  if (!permissions.acts) return null;
+  const budget = state.resources.gold * (1 - permissions.goldReserve);
 
   const wanted = pickBuildingType(state, report);
   if (wanted && getBuildCost(wanted, state.era) <= budget) {
@@ -30,15 +35,24 @@ export function planAutoAction(state: GameState, report: CityReport): AutoAction
   }
 
   const expansion = getExpansionCost(state.expansionLevel);
-  if (expansion !== null && expansion <= budget && freeTiles(state) <= AUTO_GROW.expandWhenFreeTilesAtMost) {
+  if (
+    permissions.allowExpand &&
+    expansion !== null &&
+    expansion <= budget &&
+    freeTiles(state) <= AUTO_GROW.expandWhenFreeTilesAtMost
+  ) {
     return { kind: 'expand' };
   }
 
-  const research = pickResearch(state);
-  if (research && RESEARCH[research].cost <= budget) return { kind: 'research', id: research };
+  if (permissions.allowResearch) {
+    const research = pickResearch(state);
+    if (research && RESEARCH[research].cost <= budget) return { kind: 'research', id: research };
+  }
 
-  const upgrade = pickUpgrade(state, budget);
-  if (upgrade !== null) return { kind: 'upgrade', buildingId: upgrade };
+  if (permissions.allowUpgrade) {
+    const upgrade = pickUpgrade(state, budget);
+    if (upgrade !== null) return { kind: 'upgrade', buildingId: upgrade };
+  }
 
   return null;
 }

@@ -1,3 +1,4 @@
+import { AUTO_LEVELS, GROWTH_PACE, type AutoLevel, type GrowthPace } from '../config/balance';
 import { AUDIO, QUALITY, type QualityLevel } from '../config/gameConfig';
 import { LOCALES, type LocalePreference } from '../i18n';
 
@@ -14,6 +15,10 @@ export interface Preferences {
   quality: QualityLevel | 'auto';
   /** A language, or 'auto' to follow the browser. */
   locale: LocalePreference;
+  /** How fast cities grow. */
+  growthPace: GrowthPace;
+  /** How much the advisor does on its own. */
+  autoLevel: AutoLevel;
   tutorialDone: boolean;
   /** The how-to-play dialog is shown once, on the first city. */
   helpSeen: boolean;
@@ -26,6 +31,8 @@ const DEFAULTS: Preferences = {
   sfxVolume: AUDIO.defaultSfxVolume,
   quality: 'auto',
   locale: 'auto',
+  growthPace: 'standard',
+  autoLevel: 'medium',
   tutorialDone: false,
   helpSeen: false,
 };
@@ -51,6 +58,12 @@ export function loadPreferences(): Preferences {
       stored.locale === 'auto' || (typeof stored.locale === 'string' && (LOCALES as readonly string[]).includes(stored.locale))
         ? stored.locale
         : DEFAULTS.locale,
+    growthPace: typeof stored.growthPace === 'string' && stored.growthPace in GROWTH_PACE
+      ? stored.growthPace
+      : DEFAULTS.growthPace,
+    autoLevel: typeof stored.autoLevel === 'string' && stored.autoLevel in AUTO_LEVELS
+      ? stored.autoLevel
+      : DEFAULTS.autoLevel,
     tutorialDone: stored.tutorialDone === true,
     helpSeen: stored.helpSeen === true,
   };

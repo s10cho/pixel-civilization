@@ -2,7 +2,7 @@ import { audio } from '../audio/AudioEngine';
 import { BUILDABLE_TYPES, getBuildCost, getUnlockState } from '../building/rules';
 import type { Building, BuildingType } from '../building/types';
 import { getOccupancy } from '../citizen/occupancy';
-import { AUTO_GROW, BUILDINGS, OFFLINE } from '../config/balance';
+import { AUTO_GROW, AUTO_LEVELS, BUILDINGS, GROWTH_PACE, OFFLINE, type AutoLevel } from '../config/balance';
 import { AUTO_QUALITY, CAMERA, ERA_TRANSITION, QUALITY, SAVE, SIMULATION, type QualityLevel } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
@@ -170,6 +170,8 @@ export class CityScreen implements Screen {
   private achievementsModal: Modal | null = null;
   /** Seconds since the advisor's last action. */
   private autoGrowSeconds = 0;
+  /** The level the top-bar button switches back to. */
+  private lastAutoLevel: AutoLevel = 'medium';
 
   constructor(
     private readonly viewRoot: HTMLElement,
@@ -204,6 +206,7 @@ export class CityScreen implements Screen {
     this.picker = new TilePicker(this.stage.camera, this.stage.canvas, this.buildings);
 
     this.ui = this.createUI();
+    this.applyPacePreferences();
     this.seenLevel = this.state.cityLevel;
     this.seenResearchCount = this.state.research.completed.length;
     // A resumed city earns resources for the time it was closed.
@@ -271,7 +274,7 @@ export class CityScreen implements Screen {
     if (!this.paused) {
       const step = Math.min(frameSeconds, SIMULATION.maxCatchUpSeconds);
       this.accumulator += step;
-      if (this.state.autoGrow) this.autoGrowSeconds += step;
+      if (this.state.autoLevel !== 'off') this.autoGrowSeconds += step;
     }
     if (this.autoQuality) this.adaptQuality(frameSeconds);
     let ticked = false;
@@ -282,8 +285,9 @@ export class CityScreen implements Screen {
       this.accumulator -= SIMULATION.tickSeconds;
       ticked = true;
     }
-    while (this.state.autoGrow && this.autoGrowSeconds >= AUTO_GROW.intervalSeconds) {
-      this.autoGrowSeconds -= AUTO_GROW.intervalSeconds;
+    const advisorInterval = this.advisorIntervalSeconds();
+    while (this.state.autoLevel !== 'off' && this.autoGrowSeconds >= advisorInterval) {
+      this.autoGrowSeconds -= advisorInterval;
       this.runAutoAction(true);
     }
     if (ticked) {
@@ -899,12 +903,39 @@ export class CityScreen implements Screen {
 
   // --- Auto-grow ---------------------------------------------------------------------------
 
+  /** How long the advisor waits between actions, given the pace and automation level. */
+  private advisorIntervalSeconds(): number {
+    return (
+      AUTO_GROW.intervalSeconds *
+      GROWTH_PACE[this.state.growthPace].advisorInterval *
+      AUTO_LEVELS[this.state.autoLevel].intervalMultiplier
+    );
+  }
+
+  /**
+   * The top-bar button switches the advisor off and back on at its chosen level; the level
+   * itself is picked in Settings, and both places save the same preference.
+   */
   private toggleAutoGrow(): void {
-    this.state.autoGrow = !this.state.autoGrow;
+    if (this.state.autoLevel !== 'off') this.lastAutoLevel = this.state.autoLevel;
+    this.state.autoLevel = this.state.autoLevel === 'off' ? this.lastAutoLevel : 'off';
+    savePreferences({ autoLevel: this.state.autoLevel });
     this.autoGrowSeconds = 0;
     audio.play('select');
-    this.ui.showMessage(t(this.state.autoGrow ? 'auto.enabled' : 'auto.disabled'));
+    this.ui.showMessage(t(this.state.autoLevel === 'off' ? 'auto.disabled' : 'auto.enabled'));
     this.refreshUI();
+  }
+
+  /**
+   * Applies the growth pace and automation level from Settings to this city. Callers refresh
+   * the UI themselves, since this also runs during mount before the first report exists.
+   */
+  private applyPacePreferences(): void {
+    const preferences = loadPreferences();
+    this.state.growthPace = preferences.growthPace;
+    this.state.autoLevel = preferences.autoLevel;
+    if (preferences.autoLevel !== 'off') this.lastAutoLevel = preferences.autoLevel;
+    this.autoGrowSeconds = 0;
   }
 
   /** Carries out one advisor action, if it has something worth doing. */
@@ -961,8 +992,11 @@ export class CityScreen implements Screen {
 
   /** A few advisor actions for the time the player was away, silently. */
   private runOfflineAutoGrow(creditedSeconds: number): number {
-    if (!this.state.autoGrow) return 0;
-    const allowed = Math.min(AUTO_GROW.maxOfflineActions, Math.floor(creditedSeconds / AUTO_GROW.intervalSeconds));
+    if (this.state.autoLevel === 'off') return 0;
+    const allowed = Math.min(
+      AUTO_GROW.maxOfflineActions,
+      Math.floor(creditedSeconds / this.advisorIntervalSeconds()),
+    );
     let done = 0;
     for (let i = 0; i < allowed; i++) {
       this.recomputeReport();
@@ -1013,6 +1047,10 @@ export class CityScreen implements Screen {
     if (this.settingsModal?.isOpen) return;
     this.settingsModal = openSettings(this.uiRoot, {
       onQualityChange: (quality) => this.setQualityPreference(quality),
+      onPaceChange: () => {
+        this.applyPacePreferences();
+        this.refreshUI();
+      },
       onClose: () => {
         this.settingsModal = null;
       },
@@ -1180,7 +1218,7 @@ export class CityScreen implements Screen {
       expansionCost: getExpansionCost(this.state.expansionLevel),
       hint: this.hintText(),
       tutorial: this.tutorialView(),
-      autoGrow: this.state.autoGrow,
+      autoLevel: this.state.autoLevel,
     });
   }
 }

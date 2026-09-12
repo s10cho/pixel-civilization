@@ -1555,6 +1555,49 @@ export const EVENTS = {
 } as const;
 
 /**
+ * How fast the city grows. This is a comfort setting, not a difficulty: it changes speed only,
+ * never the chance of anything going wrong (design brief Phase 2 §3).
+ */
+export type GrowthPace = 'relaxed' | 'standard' | 'fast';
+
+export const GROWTH_PACE: Record<GrowthPace, {
+  /** Multiplier on gold and research output. */
+  output: number;
+  /** Multiplier on population growth. */
+  population: number;
+  research: number;
+  /** Multiplier on the advisor's waiting time (lower acts more often). */
+  advisorInterval: number;
+}> = {
+  relaxed: { output: 0.7, population: 0.7, research: 0.75, advisorInterval: 1.6 },
+  standard: { output: 1, population: 1, research: 1, advisorInterval: 1 },
+  fast: { output: 1.6, population: 1.5, research: 1.6, advisorInterval: 0.6 },
+};
+
+/**
+ * How much the advisor is allowed to do (Phase 2 §7-8). Small things may be automatic; the
+ * big ones — where the city grows, large projects, entering an era — stay with the player.
+ */
+export type AutoLevel = 'off' | 'low' | 'medium' | 'high';
+
+export const AUTO_LEVELS: Record<AutoLevel, {
+  /** Whether the advisor builds at all ('low' only offers advice). */
+  acts: boolean;
+  intervalMultiplier: number;
+  /** Share of gold it leaves untouched. */
+  goldReserve: number;
+  allowUpgrade: boolean;
+  allowResearch: boolean;
+  /** Widening the territory is a player decision except at the highest level. */
+  allowExpand: boolean;
+}> = {
+  off: { acts: false, intervalMultiplier: 1, goldReserve: 1, allowUpgrade: false, allowResearch: false, allowExpand: false },
+  low: { acts: false, intervalMultiplier: 1.4, goldReserve: 0.5, allowUpgrade: false, allowResearch: false, allowExpand: false },
+  medium: { acts: true, intervalMultiplier: 1, goldReserve: 0.35, allowUpgrade: true, allowResearch: true, allowExpand: false },
+  high: { acts: true, intervalMultiplier: 0.6, goldReserve: 0.2, allowUpgrade: true, allowResearch: true, allowExpand: true },
+};
+
+/**
  * The optional "auto-grow" advisor: it tends the city on its own, slower than a player and
  * always leaving gold to spend, so watching it is relaxing rather than a replacement.
  */

@@ -1,6 +1,6 @@
 import { syncCitizens } from '../citizen/assignment';
 import { updateCitizens } from '../citizen/behavior';
-import { PROGRESSION } from '../config/balance';
+import { GROWTH_PACE, PROGRESSION } from '../config/balance';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
 import { updateHappiness } from '../economy/happiness';
 import { applyProduction } from '../economy/production';
@@ -12,7 +12,7 @@ import type { GameState } from './gameState';
 export function tickSimulation(state: GameState, dtSeconds: number): CityReport {
   const report = computeCityReport(state);
   applyProduction(state, report, dtSeconds);
-  advanceResearch(state, report.researchPerSecond, dtSeconds);
+  advanceResearch(state, report.researchPerSecond * GROWTH_PACE[state.growthPace].research, dtSeconds);
 
   // Every new highest population is worth a little city XP.
   const people = Math.floor(state.resources.population);

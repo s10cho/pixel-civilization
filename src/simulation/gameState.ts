@@ -1,6 +1,6 @@
 import type { Building } from '../building/types';
 import type { Citizen } from '../citizen/types';
-import { ECONOMY, EVENTS, HAPPINESS } from '../config/balance';
+import { ECONOMY, EVENTS, HAPPINESS, type AutoLevel, type GrowthPace } from '../config/balance';
 import { WORLD } from '../config/gameConfig';
 import type { AchievementId } from '../progression/achievements';
 import type { EraId } from '../progression/era';
@@ -29,8 +29,10 @@ export interface GameState {
   research: ResearchState;
   /** Number of territory expansions purchased. */
   expansionLevel: number;
-  /** Whether the advisor tends the city on its own (see simulation/autoGrow). */
-  autoGrow: boolean;
+  /** How much the advisor does on its own (see simulation/autoGrow). */
+  autoLevel: AutoLevel;
+  /** How fast the city grows; a comfort setting, never a difficulty. */
+  growthPace: GrowthPace;
   nextBuildingId: number;
   nextCitizenId: number;
   /** Achievements the city has reached (see progression/achievements.ts). */
@@ -58,7 +60,8 @@ export function createInitialState(seed: number = Date.now()): GameState {
     research: { completed: [], active: null },
     expansionLevel: 0,
     // New cities start with the advisor on, so a first-time player always sees progress.
-    autoGrow: true,
+    autoLevel: 'medium',
+    growthPace: 'standard',
     achievements: [],
     nextEventSeconds: EVENTS.intervalSeconds[0],
     nextBuildingId: 1,
