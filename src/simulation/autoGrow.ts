@@ -49,10 +49,25 @@ function pickBuildingType(state: GameState, report: CityReport): BuildingType | 
   const counts = countByType(state);
 
   if (report.powerDemand > report.powerSupply && unlocked('powerPlant')) return 'powerPlant';
-  if (unlocked('house') && state.resources.population >= report.populationCapacity * AUTO_GROW.housingFullShare) {
-    return 'house';
+
+  // Somewhere to live, with farms to feed them.
+  if (state.resources.population >= report.populationCapacity * AUTO_GROW.housingFullShare) {
+    if (unlocked('farm') && counts.farm < counts.house * AUTO_GROW.farmsPerHouse) return 'farm';
+    if (unlocked('house')) return 'house';
   }
-  if (unlocked('shop') && report.jobs < state.resources.population) return 'shop';
+
+  // Work for everyone, alternating shops and workshops.
+  if (report.jobs < state.resources.population) {
+    if (unlocked('workshop') && counts.workshop < counts.shop) return 'workshop';
+    if (unlocked('shop')) return 'shop';
+  }
+
+  // Something cheerful while the city is a bit glum.
+  if (state.resources.happiness < AUTO_GROW.happinessTarget) {
+    if (unlocked('well') && counts.well === 0) return 'well';
+    if (unlocked('inn') && counts.inn === 0) return 'inn';
+  }
+
   if (unlocked('park') && counts.park < counts.house * AUTO_GROW.parksPerHouse) return 'park';
   if (unlocked('researchCenter') && counts.researchCenter === 0) return 'researchCenter';
   // Nothing urgent: keep making room for more citizens.
@@ -107,13 +122,18 @@ function neighbourScore(state: GameState, type: BuildingType, col: number, row: 
 }
 
 function countByType(state: GameState): Record<BuildingType, number> {
-  const counts = {
+  const counts: Record<BuildingType, number> = {
     townHall: 0,
     house: 0,
+    farm: 0,
     shop: 0,
+    workshop: 0,
     park: 0,
+    well: 0,
+    inn: 0,
     powerPlant: 0,
     researchCenter: 0,
+    monument: 0,
     factory: 0,
   };
   for (const building of state.buildings) counts[building.type]++;

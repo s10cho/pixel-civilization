@@ -1124,6 +1124,66 @@ body {
   color: var(--ui-accent);
 }
 
+/* --- Achievements ---------------------------------------------------------------------- */
+
+.achievements {
+  display: grid;
+  gap: 8px;
+}
+
+.achievement {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(31, 42, 58, 0.04);
+  border-radius: 12px;
+}
+
+.achievement[data-state='done'] {
+  background: var(--ui-accent-soft);
+}
+
+.achievement-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--ui-muted);
+}
+
+.achievement[data-state='done'] .achievement-icon {
+  color: var(--ui-gold);
+}
+
+.achievement-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.achievement-name {
+  font-weight: 700;
+}
+
+.achievement-desc {
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+
+.achievement-text .progress {
+  margin-top: 6px;
+}
+
+.achievement-side {
+  text-align: right;
+  font-size: 12px;
+  color: var(--ui-muted);
+  white-space: nowrap;
+}
+
+.achievement-reward {
+  color: var(--ui-gold);
+  font-weight: 650;
+}
+
 /* --- Help ------------------------------------------------------------------------------ */
 
 .help-table {

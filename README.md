@@ -9,7 +9,8 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
 
 ## Features
 
-- **Build and grow**: homes, shops, parks, power, research and factories on a tile grid.
+- **Build and grow**: twelve kinds of building — homes, farms, shops, workshops, parks, wells,
+  inns, power, research, monuments and factories — each with its own look in every era.
   Citizens are simulated: they move in, walk to work and to parks, and show their mood.
 - **City management**: power supply and demand, staffing, adjacency bonuses (shops next to
   homes, parks around homes, factories near power), pollution and happiness. Problems are
@@ -23,6 +24,7 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
   (resources only).
 - **Auto-grow**: an optional advisor tends the city on its own — slower than you, always
   leaving gold to spend — so the city keeps growing a little between visits.
+- **Achievements**: nineteen gentle milestones with progress bars and small gold rewards.
 - **Small gifts**: a traveling merchant, a good harvest, a village festival or a wandering
   scholar drops by now and then. No event ever sets the city back.
 - **Languages**: English and Korean, following the browser by default and switchable in
@@ -73,7 +75,7 @@ src/
   citizen/         simulated citizens: assignment, daily routine, occupancy
   economy/         city report (power, staffing, adjacency, pollution), production, happiness,
                    problems
-  progression/     eras, city level, research, era requirements
+  progression/     eras, city level, research, era requirements, achievements
   tutorial/        first-time tutorial steps
   storage/         IndexedDB save slots and migrations, localStorage preferences
   audio/           WebAudio engine: generative per-era music, sound effects

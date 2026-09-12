@@ -2,6 +2,7 @@ import type { Building } from '../building/types';
 import type { Citizen } from '../citizen/types';
 import { ECONOMY, EVENTS, HAPPINESS } from '../config/balance';
 import { WORLD } from '../config/gameConfig';
+import type { AchievementId } from '../progression/achievements';
 import type { EraId } from '../progression/era';
 import type { ResearchState } from '../progression/research';
 
@@ -32,6 +33,8 @@ export interface GameState {
   autoGrow: boolean;
   nextBuildingId: number;
   nextCitizenId: number;
+  /** Achievements the city has reached (see progression/achievements.ts). */
+  achievements: AchievementId[];
   /** Seconds until the next happy event (see simulation/events.ts). */
   nextEventSeconds: number;
   /** PRNG state for simulation randomness (see simulation/random.ts). */
@@ -56,6 +59,7 @@ export function createInitialState(seed: number = Date.now()): GameState {
     expansionLevel: 0,
     // New cities start with the advisor on, so a first-time player always sees progress.
     autoGrow: true,
+    achievements: [],
     nextEventSeconds: EVENTS.intervalSeconds[0],
     nextBuildingId: 1,
     nextCitizenId: 1,

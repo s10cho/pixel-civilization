@@ -26,6 +26,7 @@ export function migrateState(version: number, raw: unknown): GameState {
     resources: { ...base.resources, ...stored.resources },
     research: { ...base.research, ...stored.research },
     buildings: stored.buildings,
+    achievements: Array.isArray(stored.achievements) ? stored.achievements : [],
     citizens: Array.isArray(stored.citizens) ? stored.citizens : [],
   };
 }

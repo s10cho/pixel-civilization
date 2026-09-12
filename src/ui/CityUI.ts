@@ -38,6 +38,7 @@ export interface CityUIHandlers {
   onTutorialNext(): void;
   onTutorialSkip(): void;
   onToggleAutoGrow(): void;
+  onOpenAchievements(): void;
 }
 
 /** Presentation state the scene pushes into the UI. */
@@ -78,6 +79,7 @@ export class CityUI {
   private readonly eraChipLabel: HTMLElement;
   private readonly researchPanel: ResearchPanel;
   private readonly autoGrowButton: HTMLButtonElement;
+  private readonly achievementsButton: HTMLButtonElement;
   private readonly researchButton: HTMLButtonElement;
   private readonly researchBadge = el('span', 'btn-badge');
   private readonly buildBar: BuildBar;
@@ -113,6 +115,12 @@ export class CityUI {
       className: 'auto-grow-button',
       onClick: handlers.onToggleAutoGrow,
     });
+    this.achievementsButton = button({
+      icon: 'trophy',
+      label: t('ui.achievements'),
+      className: 'achievements-button',
+      onClick: handlers.onOpenAchievements,
+    });
     this.researchButton = button({
       icon: 'flask',
       label: t('ui.research'),
@@ -123,6 +131,7 @@ export class CityUI {
     const topRight = el('div', 'top-right');
     topRight.append(
       this.autoGrowButton,
+      this.achievementsButton,
       this.researchButton,
       button({ icon: 'menu', label: t('ui.menu'), className: 'menu-button', onClick: handlers.onOpenMenu }),
     );

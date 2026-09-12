@@ -3,10 +3,15 @@ import type { EraId } from '../progression/era';
 export type BuildingType =
   | 'townHall'
   | 'house'
+  | 'farm'
   | 'shop'
+  | 'workshop'
   | 'park'
+  | 'well'
+  | 'inn'
   | 'powerPlant'
   | 'researchCenter'
+  | 'monument'
   | 'factory';
 
 /** Static, balance-driven description of a building type. Numbers are level-1 values. */

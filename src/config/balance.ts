@@ -162,6 +162,19 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     maxLevel: 5,
     populationCapacity: 5,
   },
+  farm: {
+    ...NO_OUTPUT,
+    buildable: true,
+    movable: true,
+    era: 'ancient',
+    cityLevel: 1,
+    buildCost: 18,
+    upgradeBaseCost: 30,
+    maxLevel: 4,
+    goldPerSecond: 0.2,
+    populationCapacity: 3,
+    jobs: 2,
+  },
   shop: {
     ...NO_OUTPUT,
     buildable: true,
@@ -175,6 +188,19 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     jobs: 4,
     powerDemand: 1,
   },
+  workshop: {
+    ...NO_OUTPUT,
+    buildable: true,
+    movable: true,
+    era: 'ancient',
+    cityLevel: 2,
+    buildCost: 45,
+    upgradeBaseCost: 60,
+    maxLevel: 4,
+    goldPerSecond: 0.9,
+    jobs: 3,
+    powerDemand: 1,
+  },
   park: {
     ...NO_OUTPUT,
     buildable: true,
@@ -186,6 +212,33 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     maxLevel: 3,
     happinessBonus: 6,
     leisureSpot: true,
+  },
+  well: {
+    ...NO_OUTPUT,
+    buildable: true,
+    movable: true,
+    era: 'ancient',
+    cityLevel: 3,
+    buildCost: 40,
+    upgradeBaseCost: 55,
+    maxLevel: 3,
+    jobs: 1,
+    happinessBonus: 4,
+  },
+  inn: {
+    ...NO_OUTPUT,
+    buildable: true,
+    movable: true,
+    era: 'ancient',
+    cityLevel: 5,
+    buildCost: 90,
+    upgradeBaseCost: 120,
+    maxLevel: 4,
+    goldPerSecond: 1.2,
+    jobs: 3,
+    happinessBonus: 3,
+    leisureSpot: true,
+    powerDemand: 1,
   },
   powerPlant: {
     ...NO_OUTPUT,
@@ -212,6 +265,17 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     powerDemand: 2,
     research: 1,
   },
+  monument: {
+    ...NO_OUTPUT,
+    buildable: true,
+    movable: true,
+    era: 'ancient',
+    cityLevel: 6,
+    buildCost: 220,
+    upgradeBaseCost: 300,
+    maxLevel: 3,
+    happinessBonus: 8,
+  },
   factory: {
     ...NO_OUTPUT,
     buildable: true,
@@ -236,6 +300,13 @@ export const TERRITORY = {
   expansionBaseCost: 120,
   /** Each expansion costs this many times the previous one. */
   expansionCostGrowth: 1.9,
+} as const;
+
+/** Thank-you gold for reaching an achievement. Small enough to stay a nice surprise. */
+export const ACHIEVEMENTS_REWARD = {
+  small: 25,
+  medium: 120,
+  large: 400,
 } as const;
 
 /**
@@ -274,6 +345,10 @@ export const AUTO_GROW = {
   housingFullShare: 0.75,
   /** Parks the advisor aims for per home. */
   parksPerHouse: 0.25,
+  /** Farms the advisor aims for per home (they feed the city). */
+  farmsPerHouse: 0.5,
+  /** Below this city happiness the advisor builds something cheerful. */
+  happinessTarget: 60,
   /** Expand only when the territory is nearly full. */
   expandWhenFreeTilesAtMost: 4,
   /** How strongly neighbour bonuses pull a new building towards a tile. */

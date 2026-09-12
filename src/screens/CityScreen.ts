@@ -10,6 +10,7 @@ import { t, tKey } from '../i18n';
 import { buildingName, eraName, eraTagline, researchDescription, researchName } from '../i18n/names';
 import { detectProblems, type CityProblem, type ProblemKind } from '../economy/problems';
 import type { EraId } from '../progression/era';
+import { checkAchievements, getAchievements, type AchievementUnlock } from '../progression/achievements';
 import { advanceEra, getEraProgress, type EraProgress } from '../progression/eraProgress';
 import { isMaxLevel, unlocksAtLevel, xpToNextLevel } from '../progression/level';
 import { getResearchStatus, hasResearchBuilding, startResearch } from '../progression/research';
@@ -45,6 +46,7 @@ import { CityUI } from '../ui/CityUI';
 import { actionErrorText, eraErrorText, eraRequirementText, problemText, researchErrorText } from '../ui/messages';
 import { Modal } from '../ui/Modal';
 import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
+import { openAchievements } from '../ui/AchievementsDialog';
 import { openHelp } from '../ui/HelpDialog';
 import { openSettings } from '../ui/SettingsDialog';
 import type { TutorialView } from '../ui/TutorialCard';
@@ -88,6 +90,9 @@ interface EraTransition {
   next: number;
   staggerSeconds: number;
 }
+
+/** Gap between achievement messages when several land at once, in ms. */
+const ACHIEVEMENT_TOAST_GAP_MS = 2200;
 
 /** How long newly unlocked build tools pulse, in ms. */
 const NEW_UNLOCK_HIGHLIGHT_MS = 10_000;
@@ -158,6 +163,7 @@ export class CityScreen implements Screen {
   /** First-time guidance for a new city, while it runs. */
   private tutorial: Tutorial | null = null;
   private helpModal: Modal | null = null;
+  private achievementsModal: Modal | null = null;
   /** Seconds since the advisor's last action. */
   private autoGrowSeconds = 0;
 
@@ -238,6 +244,7 @@ export class CityScreen implements Screen {
     this.settingsModal?.close();
     this.pauseModal?.close();
     this.helpModal?.close();
+    this.achievementsModal?.close();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('resize', this.onResize);
@@ -309,6 +316,7 @@ export class CityScreen implements Screen {
         onTutorialNext: () => this.advanceTutorial(),
         onTutorialSkip: () => this.finishTutorial(),
         onToggleAutoGrow: () => this.toggleAutoGrow(),
+        onOpenAchievements: () => this.openAchievementsDialog(),
       });
   }
 
@@ -608,8 +616,10 @@ export class CityScreen implements Screen {
     this.announcedProblems = kinds;
   }
 
-  /** Announces level-ups (highlighting what they unlock) and finished research. */
+  /** Announces level-ups (highlighting what they unlock), finished research and milestones. */
   private announceProgress(): void {
+    const unlocked = checkAchievements(this.state);
+    if (unlocked.length > 0) this.announceAchievements(unlocked);
     const completed = this.state.research.completed;
     if (completed.length > this.seenResearchCount) {
       const latest = completed[completed.length - 1];
@@ -649,6 +659,26 @@ export class CityScreen implements Screen {
         }),
       );
     }
+  }
+
+  /** Milestones the city just passed, announced one after another. */
+  private announceAchievements(unlocked: readonly AchievementUnlock[]): void {
+    audio.play('levelUp');
+    unlocked.forEach((achievement, index) => {
+      const name = tKey(`achievement.${achievement.id}.name`);
+      const text = achievement.rewardGold
+        ? t('toast.achievementReward', { name, gold: formatAmount(achievement.rewardGold) })
+        : t('toast.achievement', { name });
+      // Space them out so each one is readable.
+      if (index === 0) this.ui.showMessage(text);
+      else window.setTimeout(() => this.ui.showMessage(text), index * ACHIEVEMENT_TOAST_GAP_MS);
+    });
+  }
+
+  private openAchievementsDialog(): void {
+    if (this.achievementsModal?.isOpen) return;
+    audio.play('select');
+    this.achievementsModal = openAchievements(this.uiRoot, getAchievements(this.state));
   }
 
   /** A small gift from the world: a merchant, a harvest, a festival, a passing scholar. */

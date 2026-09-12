@@ -37,6 +37,11 @@ export const PALETTE = {
   stone: 0xbfb8aa,
   gold: 0xf2c14e,
   parchment: 0xe8dfc0,
+  crop: 0x9ac34a,
+  cropRipe: 0xd9b24a,
+  hay: 0xe0c069,
+  forge: 0xff7a3c,
+  glass: 0xbfe3f5,
   thatch: 0xc9a24a,
   mud: 0xcfb38a,
   wood: 0x9b6b3f,
@@ -151,6 +156,32 @@ function buildingParts(type: BuildingType, level: number, era: EraId): THREE.Buf
         () => library(level),
         () => laboratory(level),
       );
+    case 'farm':
+      return byEra(
+        () => field(level),
+        () => farmyard(level),
+        () => plantation(level),
+      );
+    case 'workshop':
+      return byEra(
+        () => craftShed(level),
+        () => smithy(level),
+        () => machineShop(level),
+      );
+    case 'well':
+      return byEra(
+        () => well(level),
+        () => waterTower(level),
+        () => waterworks(level),
+      );
+    case 'inn':
+      return byEra(
+        () => tavern(level),
+        () => inn(level),
+        () => hotel(level),
+      );
+    case 'monument':
+      return byEra(memorialStone, clockTower, observationDeck);
     case 'factory':
       return factory(level);
   }
@@ -450,6 +481,241 @@ function factory(level: number): THREE.BufferGeometry[] {
 
 function factoryStack(level: number): number {
   return 0.55 + 0.08 * (level - 1);
+}
+
+
+// --- Farms -------------------------------------------------------------------------------
+
+/** Rows of crops on tilled soil; more rows as the farm grows. */
+function cropRows(count: number, colour: 'crop' | 'cropRipe', width = 0.82): THREE.BufferGeometry[] {
+  const rows: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < count; i++) {
+    const z = count === 1 ? 0 : -0.34 + (0.68 * i) / (count - 1);
+    rows.push(part(box(width, 0.07, 0.09), colour, { y: 0.085, z }));
+  }
+  return rows;
+}
+
+function field(level: number): THREE.BufferGeometry[] {
+  return [
+    part(box(0.94, 0.05, 0.94), 'soil', { y: 0.025 }),
+    ...cropRows(2 + level, 'crop'),
+    part(cylinder(0.018, 0.022, 0.2, 5), 'woodDark', { x: -0.42, y: 0.1, z: -0.42 }),
+    part(cylinder(0.018, 0.022, 0.2, 5), 'woodDark', { x: 0.42, y: 0.1, z: 0.42 }),
+  ];
+}
+
+function farmyard(level: number): THREE.BufferGeometry[] {
+  return [
+    part(box(0.94, 0.05, 0.94), 'soil', { y: 0.025 }),
+    ...cropRows(1 + level, 'cropRipe', 0.5).map((row) => row.translate(0.18, 0, 0)),
+    // A small barn with a haystack beside it.
+    part(box(0.34, 0.26, 0.42), 'clothRed', { x: -0.28, y: 0.18 }),
+    part(pyramid(0.3, 0.2).scale(1, 1, 1.15), 'tileRoof', { x: -0.28, y: 0.4 }),
+    part(box(0.1, 0.14, 0.02), 'woodDark', { x: -0.28, y: 0.12, z: 0.22 }),
+    part(new THREE.ConeGeometry(0.12, 0.2, 7), 'hay', { x: 0.02, y: 0.15, z: -0.34 }),
+  ];
+}
+
+function plantation(level: number): THREE.BufferGeometry[] {
+  const silo = 0.42 + 0.04 * (level - 1);
+  return [
+    part(box(0.94, 0.05, 0.94), 'soil', { y: 0.025 }),
+    ...cropRows(2 + level, 'cropRipe', 0.56).map((row) => row.translate(0.14, 0, 0)),
+    part(cylinder(0.11, 0.12, silo, 10), 'concrete', { x: -0.3, y: 0.05 + silo / 2, z: -0.16 }),
+    part(new THREE.ConeGeometry(0.13, 0.12, 10), 'slate', { x: -0.3, y: 0.05 + silo + 0.06, z: -0.16 }),
+    part(box(0.3, 0.22, 0.3), 'brick', { x: -0.28, y: 0.16, z: 0.26 }),
+    part(box(0.34, 0.04, 0.34), 'slate', { x: -0.28, y: 0.28, z: 0.26 }),
+  ];
+}
+
+// --- Workshops ---------------------------------------------------------------------------
+
+function craftShed(level: number): THREE.BufferGeometry[] {
+  const post = 0.34 + 0.04 * (level - 1);
+  const posts = [
+    [-0.3, -0.26],
+    [0.3, -0.26],
+    [-0.3, 0.26],
+    [0.3, 0.26],
+  ].map(([x, z]) => part(cylinder(0.03, 0.035, post, 6), 'woodDark', { x, y: post / 2, z }));
+  return [
+    part(box(0.76, 0.05, 0.68), 'wood', { y: 0.025 }),
+    ...posts,
+    part(pyramid(0.58, 0.24).scale(1.15, 1, 1), 'thatch', { y: post + 0.12 }),
+    // Workbench with a log and tools.
+    part(box(0.44, 0.06, 0.2), 'wood', { x: -0.05, y: 0.2, z: -0.12 }),
+    part(cylinder(0.07, 0.07, 0.18, 8).rotateZ(Math.PI / 2), 'trunk', { x: 0.22, y: 0.12, z: 0.2 }),
+    part(box(0.03, 0.14, 0.03), 'iron', { x: -0.16, y: 0.29, z: -0.12 }),
+  ];
+}
+
+function smithy(level: number): THREE.BufferGeometry[] {
+  const wall = 0.34 + 0.05 * (level - 1);
+  return [
+    part(box(0.62, wall, 0.54), 'stone', { x: -0.08, y: wall / 2 }),
+    part(pyramid(0.5, 0.26).scale(1.2, 1, 1), 'slate', { x: -0.06, y: wall + 0.13 }),
+    part(box(0.1, 0.26, 0.1), 'brickDark', { x: -0.3, y: wall + 0.13, z: -0.16 }),
+    // Forge mouth glowing under the eaves, and an anvil on a block.
+    part(box(0.16, 0.12, 0.02), 'forge', { x: -0.08, y: 0.12, z: 0.272 }),
+    part(cylinder(0.07, 0.08, 0.1, 8), 'woodDark', { x: 0.28, y: 0.05, z: 0.16 }),
+    part(box(0.16, 0.06, 0.09), 'iron', { x: 0.28, y: 0.13, z: 0.16 }),
+  ];
+}
+
+function machineShop(level: number): THREE.BufferGeometry[] {
+  const wall = 0.36 + 0.05 * (level - 1);
+  return [
+    part(box(0.78, wall, 0.6), 'brick', { y: wall / 2 }),
+    part(box(0.82, 0.05, 0.64), 'slate', { y: wall + 0.025 }),
+    part(box(0.6, 0.12, 0.01), 'glass', { y: wall * 0.66, z: 0.302 }),
+    part(box(0.2, 0.1, 0.24), 'iron', { x: 0.2, y: wall + 0.08, z: -0.1 }),
+    part(cylinder(0.05, 0.05, 0.12, 8), 'iron', { x: -0.22, y: wall + 0.09, z: -0.12 }),
+    part(box(0.16, 0.16, 0.16), 'woodDark', { x: 0.3, y: 0.08, z: 0.34 }),
+  ];
+}
+
+// --- Water -------------------------------------------------------------------------------
+
+function well(level: number): THREE.BufferGeometry[] {
+  const roof = 0.42 + 0.03 * (level - 1);
+  return [
+    part(cylinder(0.2, 0.22, 0.16, 10), 'stone', { y: 0.08 }),
+    part(cylinder(0.15, 0.15, 0.03, 10), 'water', { y: 0.165 }),
+    part(cylinder(0.022, 0.022, roof, 6), 'woodDark', { x: -0.16, y: 0.16 + roof / 2 }),
+    part(cylinder(0.022, 0.022, roof, 6), 'woodDark', { x: 0.16, y: 0.16 + roof / 2 }),
+    part(pyramid(0.3, 0.16).scale(1, 1, 0.8), 'thatch', { y: 0.16 + roof + 0.08 }),
+    part(cylinder(0.02, 0.02, 0.3, 6).rotateZ(Math.PI / 2), 'wood', { y: 0.16 + roof - 0.03 }),
+    part(cylinder(0.05, 0.045, 0.08, 8), 'wood', { y: 0.16 + roof - 0.12 }),
+  ];
+}
+
+function waterTower(level: number): THREE.BufferGeometry[] {
+  const legs = 0.34 + 0.04 * (level - 1);
+  const tank = 0.26;
+  const posts = [
+    [-0.16, -0.16],
+    [0.16, -0.16],
+    [-0.16, 0.16],
+    [0.16, 0.16],
+  ].map(([x, z]) => part(box(0.045, legs, 0.045), 'woodDark', { x, y: legs / 2, z }));
+  return [
+    part(box(0.56, 0.05, 0.56), 'stone', { y: 0.025 }),
+    ...posts,
+    part(box(0.44, 0.04, 0.44), 'wood', { y: legs }),
+    part(cylinder(0.2, 0.2, tank, 10), 'wood', { y: legs + tank / 2 }),
+    part(cylinder(0.21, 0.21, 0.03, 10), 'iron', { y: legs + tank * 0.8 }),
+    part(new THREE.ConeGeometry(0.24, 0.14, 10), 'tileRoof', { y: legs + tank + 0.07 }),
+    part(cylinder(0.03, 0.03, 0.18, 6), 'iron', { x: 0.2, y: legs - 0.06, z: 0.1 }),
+  ];
+}
+
+function waterworks(level: number): THREE.BufferGeometry[] {
+  const tank = 0.2 + 0.03 * (level - 1);
+  return [
+    part(box(0.9, 0.05, 0.82), 'concrete', { y: 0.025 }),
+    part(cylinder(0.22, 0.22, tank, 12), 'concrete', { x: -0.2, y: 0.05 + tank / 2, z: -0.1 }),
+    part(cylinder(0.19, 0.19, 0.02, 12), 'water', { x: -0.2, y: 0.05 + tank, z: -0.1 }),
+    part(cylinder(0.16, 0.16, tank * 0.8, 12), 'concrete', { x: 0.24, y: 0.05 + tank * 0.4, z: 0.2 }),
+    part(cylinder(0.13, 0.13, 0.02, 12), 'water', { x: 0.24, y: 0.05 + tank * 0.8, z: 0.2 }),
+    part(cylinder(0.04, 0.04, 0.5, 8).rotateZ(Math.PI / 2), 'iron', { x: 0.02, y: 0.12, z: 0.06 }),
+    part(box(0.2, 0.18, 0.16), 'plaster', { x: 0.26, y: 0.14, z: -0.26 }),
+  ];
+}
+
+// --- Inns --------------------------------------------------------------------------------
+
+function signPost(x: number, z: number, height: number, cloth: ColorKey): THREE.BufferGeometry[] {
+  return [
+    part(cylinder(0.02, 0.022, height, 6), 'woodDark', { x, y: height / 2, z }),
+    part(box(0.14, 0.1, 0.02), cloth, { x: x + 0.07, y: height - 0.08, z }),
+  ];
+}
+
+function tavern(level: number): THREE.BufferGeometry[] {
+  const wall = 0.3 + 0.05 * (level - 1);
+  return [
+    part(box(0.6, wall, 0.5), 'mud', { x: -0.1, y: wall / 2 }),
+    part(pyramid(0.5, 0.26).scale(1.2, 1, 1), 'thatch', { x: -0.08, y: wall + 0.13 }),
+    part(box(0.5, 0.03, 0.22), 'cloth', { x: -0.02, y: wall * 0.85, z: 0.3, rotX: 0.3 }),
+    part(box(0.28, 0.05, 0.14), 'wood', { x: 0.06, y: 0.12, z: 0.3 }),
+    part(box(0.28, 0.04, 0.06), 'woodDark', { x: 0.06, y: 0.06, z: 0.38 }),
+    ...signPost(0.3, -0.22, wall + 0.2, 'clothRed'),
+  ];
+}
+
+function inn(level: number): THREE.BufferGeometry[] {
+  const floor = 0.28 + 0.04 * (level - 1);
+  return [
+    part(box(0.64, floor, 0.54), 'plaster', { y: floor / 2 }),
+    part(box(0.68, floor * 0.9, 0.58), 'plaster', { y: floor + (floor * 0.9) / 2 }),
+    part(box(0.7, 0.04, 0.6), 'woodDark', { y: floor }),
+    part(pyramid(0.56, 0.3).scale(1.2, 1, 1), 'tileRoof', { y: floor * 1.9 + 0.15 }),
+    part(box(0.12, 0.2, 0.02), 'woodDark', { y: 0.1, z: 0.275 }),
+    part(box(0.1, 0.1, 0.01), 'window', { x: -0.2, y: floor + 0.14, z: 0.292 }),
+    part(box(0.1, 0.1, 0.01), 'window', { x: 0.2, y: floor + 0.14, z: 0.292 }),
+    ...signPost(0.34, 0.28, floor + 0.24, 'flag'),
+  ];
+}
+
+function hotel(level: number): THREE.BufferGeometry[] {
+  const height = 0.6 + 0.12 * (level - 1);
+  const parts = [
+    part(box(0.66, height, 0.56), 'brick', { y: height / 2 }),
+    part(box(0.7, 0.05, 0.6), 'slate', { y: height + 0.025 }),
+    part(box(0.48, 0.03, 0.16), 'clothRed', { y: 0.3, z: 0.33 }),
+    part(box(0.14, 0.24, 0.02), 'glass', { y: 0.12, z: 0.285 }),
+    part(box(0.3, 0.06, 0.01), 'gold', { y: 0.4, z: 0.288 }),
+  ];
+  for (let y = 0.5; y < height - 0.08; y += 0.18) {
+    for (const x of [-0.18, 0.02, 0.22]) {
+      parts.push(part(box(0.1, 0.1, 0.01), 'window', { x, y, z: 0.285 }));
+    }
+  }
+  return parts;
+}
+
+// --- Monuments ---------------------------------------------------------------------------
+
+function memorialStone(): THREE.BufferGeometry[] {
+  // A plain engraved slab on a stepped base, with a flower bed around it.
+  return [
+    part(box(0.72, 0.06, 0.72), 'parkGrass', { y: 0.03 }),
+    part(box(0.46, 0.07, 0.46), 'stone', { y: 0.095 }),
+    part(box(0.34, 0.06, 0.34), 'stone', { y: 0.16 }),
+    part(box(0.26, 0.44, 0.1), 'plaster', { y: 0.41 }),
+    part(box(0.18, 0.02, 0.01), 'woodDark', { y: 0.5, z: 0.052 }),
+    part(box(0.18, 0.02, 0.01), 'woodDark', { y: 0.44, z: 0.052 }),
+    part(box(0.18, 0.02, 0.01), 'woodDark', { y: 0.38, z: 0.052 }),
+    part(box(0.06, 0.05, 0.06), 'flower', { x: -0.28, y: 0.08, z: 0.28 }),
+    part(box(0.06, 0.05, 0.06), 'clothRed', { x: 0.28, y: 0.08, z: -0.26 }),
+  ];
+}
+
+function clockTower(): THREE.BufferGeometry[] {
+  const shaft = 0.66;
+  return [
+    part(box(0.42, 0.08, 0.42), 'stone', { y: 0.04 }),
+    part(box(0.3, shaft, 0.3), 'stone', { y: 0.08 + shaft / 2 }),
+    part(box(0.36, 0.06, 0.36), 'slate', { y: 0.08 + shaft + 0.03 }),
+    part(cylinder(0.11, 0.11, 0.03, 14), 'plaster', { y: 0.08 + shaft * 0.78, z: 0.155, rotX: Math.PI / 2 }),
+    part(box(0.015, 0.07, 0.01), 'woodDark', { y: 0.08 + shaft * 0.78 + 0.03, z: 0.172 }),
+    part(box(0.05, 0.015, 0.01), 'woodDark', { x: 0.02, y: 0.08 + shaft * 0.78, z: 0.172 }),
+    part(pyramid(0.26, 0.24), 'tileRoof', { y: 0.08 + shaft + 0.16 }),
+    part(box(0.1, 0.18, 0.02), 'woodDark', { y: 0.17, z: 0.152 }),
+  ];
+}
+
+function observationDeck(): THREE.BufferGeometry[] {
+  const column = 0.72;
+  return [
+    part(cylinder(0.14, 0.2, 0.08, 12), 'concrete', { y: 0.04 }),
+    part(cylinder(0.09, 0.11, column, 12), 'concrete', { y: 0.08 + column / 2 }),
+    part(cylinder(0.26, 0.22, 0.1, 14), 'concrete', { y: 0.08 + column + 0.05 }),
+    part(cylinder(0.24, 0.24, 0.08, 14), 'glass', { y: 0.08 + column + 0.14 }),
+    part(cylinder(0.26, 0.26, 0.02, 14), 'iron', { y: 0.08 + column + 0.19 }),
+    part(cylinder(0.02, 0.02, 0.14, 6), 'iron', { y: 0.08 + column + 0.27 }),
+  ];
 }
 
 // --- Moving parts and effects ------------------------------------------------------------
