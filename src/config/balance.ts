@@ -239,6 +239,27 @@ export const TERRITORY = {
 } as const;
 
 /**
+ * Small happy things that drop in now and then. Every event is a gift: nothing here can set
+ * the city back.
+ */
+export const EVENTS = {
+  /** Seconds between events, picked at random in this range. */
+  intervalSeconds: [110, 220] as const,
+  /** The city stays quiet until it has at least this many buildings. */
+  minBuildings: 3,
+  /** A merchant pays about this many seconds of the city's income... */
+  merchantIncomeSeconds: 60,
+  /** ...but never less than this. */
+  merchantMinGold: 30,
+  /** Citizens who move in after a good harvest (never above housing). */
+  harvestCitizens: 4,
+  /** Mood lift for every citizen at a festival. */
+  festivalHappiness: 12,
+  /** Research points a wandering scholar contributes. */
+  scholarPoints: 30,
+} as const;
+
+/**
  * The optional "auto-grow" advisor: it tends the city on its own, slower than a player and
  * always leaving gold to spend, so watching it is relaxing rather than a replacement.
  */

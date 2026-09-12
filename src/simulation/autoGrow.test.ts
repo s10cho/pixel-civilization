@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { AUTO_GROW } from '../config/balance';
 import { computeCityReport } from '../economy/cityReport';
 import { getUnlockedArea } from '../world/territory';
 import { planAutoAction } from './autoGrow';

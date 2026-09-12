@@ -182,6 +182,11 @@ export const ko: Record<MessageKey, string> = {
   'auto.expanded': '자동 성장: 영지를 넓혔습니다',
   'auto.research': '자동 성장: {name} 연구 시작',
   'auto.offline': '자리를 비운 동안 {count}가지 일도 해뒀습니다.',
+  'event.merchant': '여행 상인이 다녀갔습니다: +{gold} 골드',
+  'event.harvest': '풍년입니다! 이웃 {count}명이 이사 왔습니다',
+  'event.festival': '마을 잔치가 열렸습니다. 모두 기분이 좋아졌어요',
+  'event.scholar': '떠돌이 학자가 연구를 도왔습니다: +{points}',
+
   'menu.help': '조작법',
   'help.title': '조작법',
   'help.intro': '아래에서 건물을 고른 뒤 초록 타일을 누르면 됩니다. 나머지는 천천히 익혀도 괜찮아요.',

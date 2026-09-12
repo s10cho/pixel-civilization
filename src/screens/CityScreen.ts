@@ -34,10 +34,12 @@ import {
 } from '../simulation/actions';
 import { createInitialState, type GameState } from '../simulation/gameState';
 import { planAutoAction, type AutoAction } from '../simulation/autoGrow';
+import { maybeTriggerEvent, type CityEvent } from '../simulation/events';
 import { applyOfflineProgress } from '../simulation/offline';
 import { tickSimulation } from '../simulation/tick';
 import { saveSlot, type LoadedSave } from '../storage/saveStore';
 import type { BuildOption } from '../ui/BuildBar';
+import { formatAmount } from '../ui/format';
 import type { CityInfo, EraInfo } from '../ui/BuildingPanel';
 import { CityUI } from '../ui/CityUI';
 import { actionErrorText, eraErrorText, eraRequirementText, problemText, researchErrorText } from '../ui/messages';
@@ -264,6 +266,8 @@ export class CityScreen implements Screen {
     let ticked = false;
     while (this.accumulator >= SIMULATION.tickSeconds) {
       this.report = tickSimulation(this.state, SIMULATION.tickSeconds);
+      const event = maybeTriggerEvent(this.state, this.report, SIMULATION.tickSeconds);
+      if (event) this.announceEvent(event);
       this.accumulator -= SIMULATION.tickSeconds;
       ticked = true;
     }
@@ -645,6 +649,18 @@ export class CityScreen implements Screen {
         }),
       );
     }
+  }
+
+  /** A small gift from the world: a merchant, a harvest, a festival, a passing scholar. */
+  private announceEvent(event: CityEvent): void {
+    audio.play('levelUp');
+    this.ui.showMessage(
+      tKey(`event.${event.id}`, {
+        gold: formatAmount(event.gold ?? 0),
+        count: event.citizens ?? 0,
+        points: event.research ?? 0,
+      }),
+    );
   }
 
   /** The player's decision to enter the next era: starts the transformation sequence. */

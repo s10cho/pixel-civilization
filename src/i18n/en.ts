@@ -183,6 +183,11 @@ export const en = {
   'auto.expanded': 'Auto-grow: widened the territory',
   'auto.research': 'Auto-grow: started {name}',
   'auto.offline': 'While you were away it also took care of {count} things.',
+  'event.merchant': 'A traveling merchant came by: +{gold} gold',
+  'event.harvest': 'A good harvest: {count} new neighbours moved in',
+  'event.festival': 'A village festival: everyone feels a little better',
+  'event.scholar': 'A wandering scholar helped with the research: +{points}',
+
   'menu.help': 'How to play',
   'help.title': 'How to play',
   'help.intro': 'Tap a building tool below, then tap a green tile. Everything else is optional.',

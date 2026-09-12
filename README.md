@@ -1,8 +1,9 @@
 # Pixel Civilization
 
-An idle civilization builder in the browser: grow a tiny settlement through the Ancient,
+A calm idle civilization builder in the browser: grow a tiny settlement through the Ancient,
 Medieval and Industrial eras. The city is a low-poly isometric 3D scene (Three.js) with a
 card-style DOM interface, generative music and synthesized sound — no image or audio assets.
+Nothing in the game can be lost or destroyed: shortages only slow the city down gently.
 
 **Play:** https://s10cho.github.io/pixel-civilization/
 
@@ -20,8 +21,15 @@ card-style DOM interface, generative music and synthesized sound — no image or
 - **Rearrange**: drag a building (or long-press on touch) to move it.
 - **Saves**: three IndexedDB save slots with autosave. Time away is credited for up to 8 hours
   (resources only).
-- **Settings**: music and effect volume, graphics quality (Auto adapts to the frame rate).
-- First-time tutorial, pause menu, PC and mobile layouts.
+- **Auto-grow**: an optional advisor tends the city on its own — slower than you, always
+  leaving gold to spend — so the city keeps growing a little between visits.
+- **Small gifts**: a traveling merchant, a good harvest, a village festival or a wandering
+  scholar drops by now and then. No event ever sets the city back.
+- **Languages**: English and Korean, following the browser by default and switchable in
+  Settings.
+- **Settings**: music and effect volume, language, graphics quality (Auto adapts to the frame
+  rate).
+- First-time how-to-play card, tutorial, pause menu, PC and mobile layouts.
 
 ## Controls
 
@@ -33,6 +41,7 @@ card-style DOM interface, generative music and synthesized sound — no image or
 | Zoom | wheel | pinch |
 | Move a building | drag it | long-press, then drag |
 | Cancel tool / open pause menu | Esc | Menu button |
+| Let the city grow by itself | Auto-grow button (top bar) | Auto-grow button (top bar) |
 
 ## Scripts
 
@@ -56,7 +65,9 @@ the state and send player actions.
 src/
   main.ts          entry point: screen switching, audio unlock
   config/          presentation constants (gameConfig), gameplay balance (balance), research tree
-  simulation/      game state, fixed-step tick, player actions, offline progress
+  i18n/            message catalogs (English defines the keys) and display names
+  simulation/      game state, fixed-step tick, player actions, offline progress, auto-grow
+                   advisor, happy events
   world/           territory and placement rules
   building/        building types, costs, levels, unlocks
   citizen/         simulated citizens: assignment, daily routine, occupancy
