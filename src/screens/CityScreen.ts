@@ -1,11 +1,13 @@
 import { audio } from '../audio/AudioEngine';
-import { BUILDABLE_TYPES, buildingName, getBuildCost, getUnlockState } from '../building/rules';
+import { BUILDABLE_TYPES, getBuildCost, getUnlockState } from '../building/rules';
 import type { Building, BuildingType } from '../building/types';
 import { getOccupancy } from '../citizen/occupancy';
-import { BUILDINGS, ERA_SETTINGS, OFFLINE } from '../config/balance';
+import { BUILDINGS, OFFLINE } from '../config/balance';
 import { AUTO_QUALITY, CAMERA, ERA_TRANSITION, QUALITY, SAVE, SIMULATION, type QualityLevel } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
+import { t, tKey } from '../i18n';
+import { buildingName, eraName, eraTagline, researchDescription, researchName } from '../i18n/names';
 import { detectProblems, type CityProblem, type ProblemKind } from '../economy/problems';
 import type { EraId } from '../progression/era';
 import { advanceEra, getEraProgress, type EraProgress } from '../progression/eraProgress';
@@ -37,14 +39,7 @@ import { saveSlot, type LoadedSave } from '../storage/saveStore';
 import type { BuildOption } from '../ui/BuildBar';
 import type { CityInfo, EraInfo } from '../ui/BuildingPanel';
 import { CityUI } from '../ui/CityUI';
-import {
-  ACTION_ERROR_MESSAGES,
-  ERA_ERROR_MESSAGES,
-  ERA_TAGLINES,
-  eraRequirementText,
-  problemText,
-  RESEARCH_ERROR_MESSAGES,
-} from '../ui/messages';
+import { actionErrorText, eraErrorText, eraRequirementText, problemText, researchErrorText } from '../ui/messages';
 import { Modal } from '../ui/Modal';
 import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
 import { openSettings } from '../ui/SettingsDialog';
@@ -191,21 +186,7 @@ export class CityScreen implements Screen {
     this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
     this.picker = new TilePicker(this.stage.camera, this.stage.canvas, this.buildings);
 
-    this.ui = new CityUI(this.uiRoot, {
-      onSelectTool: (type) => this.selectTool(type),
-      onUpgrade: (buildingId) => this.upgrade(buildingId),
-      onMoveBuilding: (buildingId) => this.toggleMove(buildingId),
-      onCloseBuildingPanel: () => this.clearSelection(),
-      onExpand: () => this.expand(),
-      onFocusProblem: (kind) => this.focusProblem(kind),
-      onToggleResearch: () => this.toggleResearch(),
-      onStartResearch: (id) => this.beginResearch(id),
-      onAdvanceEra: () => this.advance(),
-      onShowEra: () => this.showTownHall(),
-      onOpenMenu: () => this.openPause(),
-      onTutorialNext: () => this.advanceTutorial(),
-      onTutorialSkip: () => this.finishTutorial(),
-    });
+    this.ui = this.createUI();
     this.seenLevel = this.state.cityLevel;
     this.seenResearchCount = this.state.research.completed.length;
     // A resumed city earns resources for the time it was closed.
@@ -285,6 +266,31 @@ export class CityScreen implements Screen {
     this.stage.render();
   };
 
+  private createUI(): CityUI {
+      return new CityUI(this.uiRoot, {
+        onSelectTool: (type) => this.selectTool(type),
+        onUpgrade: (buildingId) => this.upgrade(buildingId),
+        onMoveBuilding: (buildingId) => this.toggleMove(buildingId),
+        onCloseBuildingPanel: () => this.clearSelection(),
+        onExpand: () => this.expand(),
+        onFocusProblem: (kind) => this.focusProblem(kind),
+        onToggleResearch: () => this.toggleResearch(),
+        onStartResearch: (id) => this.beginResearch(id),
+        onAdvanceEra: () => this.advance(),
+        onShowEra: () => this.showTownHall(),
+        onOpenMenu: () => this.openPause(),
+        onTutorialNext: () => this.advanceTutorial(),
+        onTutorialSkip: () => this.finishTutorial(),
+      });
+  }
+
+  /** Rebuilds the DOM UI (e.g. after a language change), keeping the city untouched. */
+  rebuildUI(): void {
+    this.ui.destroy();
+    this.ui = this.createUI();
+    this.refreshUI();
+  }
+
   // --- Saving and time away ----------------------------------------------------------------
 
   /** Queues a save of the current state to this city's slot. */
@@ -294,7 +300,7 @@ export class CityScreen implements Screen {
       .catch(() => {
         if (this.saveErrorShown) return;
         this.saveErrorShown = true;
-        this.ui.showMessage('Could not save the game in this browser');
+  this.ui.showMessage(t('toast.saveFailed'));
       });
     return this.saving;
   }
@@ -488,7 +494,7 @@ export class CityScreen implements Screen {
         this.popBuilding(getBuildingAt(this.state, tile.col, tile.row)?.id);
         audio.play('place');
         this.notifyTutorial({ kind: 'placed', type: this.activeTool });
-      } else this.fail(ACTION_ERROR_MESSAGES[result.error]);
+      } else this.fail(actionErrorText(result.error));
       this.hoverTile = tile;
       this.updatePreview();
       this.refreshUI();
@@ -532,7 +538,7 @@ export class CityScreen implements Screen {
       this.popBuilding(buildingId);
       audio.play('move');
     } else {
-      this.fail(ACTION_ERROR_MESSAGES[result.error]);
+      this.fail(actionErrorText(result.error));
       if (!keepModeOnFailure) this.movingBuildingId = null;
     }
     this.updatePreview();
@@ -579,7 +585,7 @@ export class CityScreen implements Screen {
     if (completed.length > this.seenResearchCount) {
       const latest = completed[completed.length - 1];
       this.seenResearchCount = completed.length;
-      this.ui.showMessage(`Research complete: ${RESEARCH[latest].name}`);
+      this.ui.showMessage(t('toast.researchComplete', { name: researchName(latest) }));
       audio.play('research');
       // Its bonuses apply now, not on the next tick.
       this.recomputeReport();
@@ -594,7 +600,9 @@ export class CityScreen implements Screen {
       audio.play('levelUp');
       const names = unlocked.map((type) => buildingName(type, this.state.era));
       this.ui.showMessage(
-        `City level ${this.state.cityLevel}!${names.length ? ` New: ${names.join(', ')}` : ''}`,
+        names.length
+          ? t('toast.levelUpNew', { level: this.state.cityLevel, names: names.join(', ') })
+          : t('toast.levelUp', { level: this.state.cityLevel }),
       );
       if (unlocked.length) {
         this.newUnlocks = new Set(unlocked);
@@ -606,7 +614,10 @@ export class CityScreen implements Screen {
     if (progress?.ready && !this.announcedEraReady) {
       this.announcedEraReady = true;
       this.ui.showMessage(
-        `Ready for the ${ERA_SETTINGS[progress.next].name} Era! Visit the ${buildingName('townHall', this.state.era)}.`,
+        t('toast.eraReady', {
+          era: eraName(progress.next),
+          building: buildingName('townHall', this.state.era),
+        }),
       );
     }
   }
@@ -616,7 +627,7 @@ export class CityScreen implements Screen {
     const from = this.state.era;
     const result = advanceEra(this.state);
     if (!result.ok) {
-      this.fail(ERA_ERROR_MESSAGES[result.error]);
+      this.fail(eraErrorText(result.error));
       return;
     }
     audio.play('era');
@@ -647,7 +658,7 @@ export class CityScreen implements Screen {
       ),
     };
     this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
-    this.ui.playEraTransition(`${ERA_SETTINGS[result.era].name} Era`, ERA_TAGLINES[result.era]);
+    this.ui.playEraTransition(eraName(result.era), eraTagline(result.era));
     this.onCityChanged();
     this.refreshUI();
   }
@@ -719,7 +730,7 @@ export class CityScreen implements Screen {
   private beginResearch(id: ResearchId): void {
     const result = startResearch(this.state, id);
     if (result.ok) audio.play('select');
-    else this.fail(RESEARCH_ERROR_MESSAGES[result.error]);
+    else this.fail(researchErrorText(result.error));
     this.refreshUI();
   }
 
@@ -782,7 +793,7 @@ export class CityScreen implements Screen {
       this.onCityChanged();
       this.popBuilding(buildingId);
       audio.play('upgrade');
-    } else this.fail(ACTION_ERROR_MESSAGES[result.error]);
+    } else this.fail(actionErrorText(result.error));
     this.refreshUI();
   }
 
@@ -796,7 +807,7 @@ export class CityScreen implements Screen {
       this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
       this.announceProgress();
     } else {
-      this.fail(ACTION_ERROR_MESSAGES[result.error]);
+      this.fail(actionErrorText(result.error));
     }
     this.refreshUI();
   }
@@ -817,13 +828,13 @@ export class CityScreen implements Screen {
     this.cancelTool();
     this.cancelMove();
     this.pauseModal = new Modal(this.uiRoot, {
-      title: 'Paused',
+      title: t('pause.title'),
       icon: 'pause',
-      body: 'Your city waits while this menu is open. It is saved automatically.',
+      body: t('pause.body'),
       actions: [
-        { label: 'Settings', icon: 'settings', keepOpen: true, onClick: () => this.openSettingsDialog() },
-        { label: 'Save & exit', icon: 'arrowLeft', variant: 'warning', onClick: () => this.exitToMenu() },
-        { label: 'Resume', icon: 'play', variant: 'primary' },
+        { label: t('pause.settings'), icon: 'settings', keepOpen: true, onClick: () => this.openSettingsDialog() },
+        { label: t('pause.saveExit'), icon: 'arrowLeft', variant: 'warning', onClick: () => this.exitToMenu() },
+        { label: t('pause.resume'), icon: 'play', variant: 'primary' },
       ],
       onClose: () => {
         this.paused = false;
@@ -885,11 +896,16 @@ export class CityScreen implements Screen {
   private tutorialView(): TutorialView | null {
     const step = this.tutorial?.step;
     if (!this.tutorial || !step) return null;
+    const names = {
+      house: buildingName('house', this.state.era),
+      shop: buildingName('shop', this.state.era),
+      townHall: buildingName('townHall', this.state.era),
+    };
     return {
       step: this.tutorial.stepNumber,
       total: TUTORIAL_STEPS.length,
-      title: step.title,
-      text: step.text,
+      title: tKey(step.titleKey, names),
+      text: tKey(step.textKey, names),
       canContinue: !step.completes,
     };
   }
@@ -923,8 +939,8 @@ export class CityScreen implements Screen {
 
   private eraInfo(progress: EraProgress | null): EraInfo {
     return {
-      current: ERA_SETTINGS[this.state.era].name,
-      next: progress ? ERA_SETTINGS[progress.next].name : null,
+      current: this.state.era,
+      next: progress?.next ?? null,
       requirements: (progress?.requirements ?? []).map((requirement) => ({
         met: requirement.met,
         text: eraRequirementText(requirement),
@@ -942,15 +958,15 @@ export class CityScreen implements Screen {
       const definition = RESEARCH[id];
       cards.push({
         id,
-        name: definition.name,
-        description: definition.description,
-        eraName: ERA_SETTINGS[definition.era].name,
+        name: researchName(id),
+        description: researchDescription(id),
+        eraName: eraName(definition.era),
         cost: definition.cost,
         status,
         progress: state.research.active?.id === id ? state.research.active.progress / definition.points : 0,
         missing: definition.requires
           .filter((required) => !state.research.completed.includes(required))
-          .map((required) => RESEARCH[required].name),
+          .map((required) => researchName(required)),
       });
     }
     return {
@@ -966,10 +982,10 @@ export class CityScreen implements Screen {
 
   private hintText(): string | null {
     if (this.activeTool) {
-      return `Tap a tile to place a ${buildingName(this.activeTool, this.state.era)}. Tap the button again to stop.`;
+      return t('hint.place', { building: buildingName(this.activeTool, this.state.era) });
     }
     const moving = this.movingBuilding();
-    if (moving) return `Tap a tile to move the ${buildingName(moving.type, this.state.era)}.`;
+    if (moving) return t('hint.move', { building: buildingName(moving.type, this.state.era) });
     return null;
   }
 
@@ -992,7 +1008,7 @@ export class CityScreen implements Screen {
       problems: this.problems,
       research: this.researchView(),
       researchProgress: active ? active.progress / RESEARCH[active.id].points : null,
-      eraReady: eraProgress?.ready ? ERA_SETTINGS[eraProgress.next].name : null,
+      eraReady: eraProgress?.ready ? eraProgress.next : null,
       expansionCost: getExpansionCost(this.state.expansionLevel),
       hint: this.hintText(),
       tutorial: this.tutorialView(),

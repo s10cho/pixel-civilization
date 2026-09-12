@@ -1,4 +1,5 @@
 import { AUDIO, QUALITY, type QualityLevel } from '../config/gameConfig';
+import { LOCALES, type LocalePreference } from '../i18n';
 
 /**
  * Player preferences. These live in localStorage (design brief: localStorage is for
@@ -11,6 +12,8 @@ export interface Preferences {
   sfxVolume: number;
   /** A fixed preset, or 'auto' to adapt to the device's frame rate. */
   quality: QualityLevel | 'auto';
+  /** A language, or 'auto' to follow the browser. */
+  locale: LocalePreference;
   tutorialDone: boolean;
 }
 
@@ -20,6 +23,7 @@ const DEFAULTS: Preferences = {
   musicVolume: AUDIO.defaultMusicVolume,
   sfxVolume: AUDIO.defaultSfxVolume,
   quality: 'auto',
+  locale: 'auto',
   tutorialDone: false,
 };
 
@@ -40,6 +44,10 @@ export function loadPreferences(): Preferences {
       stored.quality === 'auto' || (typeof stored.quality === 'string' && stored.quality in QUALITY)
         ? stored.quality
         : DEFAULTS.quality,
+    locale:
+      stored.locale === 'auto' || (typeof stored.locale === 'string' && (LOCALES as readonly string[]).includes(stored.locale))
+        ? stored.locale
+        : DEFAULTS.locale,
     tutorialDone: stored.tutorialDone === true,
   };
   return cached;

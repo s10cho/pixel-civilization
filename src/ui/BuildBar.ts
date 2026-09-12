@@ -1,5 +1,6 @@
 import { BUILDABLE_TYPES, type UnlockState } from '../building/rules';
 import type { BuildingType } from '../building/types';
+import { t } from '../i18n';
 import { button, el, setText } from './dom';
 import { formatAmount } from './format';
 import { BUILDING_ICONS } from './icons';
@@ -54,10 +55,10 @@ export class BuildBar {
       entry.node.setAttribute('aria-pressed', String(option.type === activeTool));
       setText(entry.label, option.name);
       entry.cost.hidden = locked;
-      setText(entry.cost, `${formatAmount(option.cost)}g`);
+      setText(entry.cost, t('format.gold', { amount: formatAmount(option.cost) }));
       entry.cost.classList.toggle('is-unaffordable', gold < option.cost);
       entry.lock.hidden = !locked;
-      setText(entry.lock, `Lv ${option.requiredLevel}`);
+      setText(entry.lock, t('build.lockLevel', { level: option.requiredLevel }));
     }
   }
 }

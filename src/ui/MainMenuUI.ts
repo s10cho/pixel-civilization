@@ -1,4 +1,5 @@
-import { ERA_SETTINGS } from '../config/balance';
+import { t } from '../i18n';
+import { eraName } from '../i18n/names';
 import type { SlotInfo } from '../storage/saveStore';
 import { button, el } from './dom';
 import { formatAgo, formatAmount } from './format';
@@ -38,7 +39,7 @@ export class MainMenuUI {
     this.element.append(
       icon('building', 'main-menu-logo'),
       el('h1', 'main-menu-title', 'Pixel Civilization'),
-      el('p', 'main-menu-subtitle', 'Build a tiny settlement into a great civilization'),
+      el('p', 'main-menu-subtitle', t('app.subtitle')),
       this.content,
     );
     root.append(this.element);
@@ -80,33 +81,44 @@ export class MainMenuUI {
     const buttons = el('div', 'main-menu-buttons');
     const continueButton = button({
       icon: 'play',
-      label: 'Continue',
+      label: t('menu.continue'),
       variant: latest ? 'primary' : undefined,
       disabled: !latest,
       onClick: () => latest && this.handlers.onContinue(latest.slot),
     });
     buttons.append(continueButton);
     if (latest) {
-      buttons.append(el('p', 'main-menu-caption', `Slot ${latest.slot} · ${slotLine(latest)} · ${formatAgo(latest.savedAt)}`));
+      buttons.append(
+        el(
+          'p',
+          'main-menu-caption',
+          t('menu.continueCaption', { slot: latest.slot, line: slotLine(latest), ago: formatAgo(latest.savedAt) }),
+        ),
+      );
     }
     buttons.append(
       button({
         icon: 'plus',
-        label: 'New Game',
+        label: t('menu.newGame'),
         variant: latest ? undefined : 'primary',
         disabled: this.view.slots === null,
         onClick: () => this.setMode('new'),
       }),
-      button({ icon: 'folder', label: 'Load Game', disabled: saved.length === 0, onClick: () => this.setMode('load') }),
+      button({
+        icon: 'folder',
+        label: t('menu.loadGame'),
+        disabled: saved.length === 0,
+        onClick: () => this.setMode('load'),
+      }),
       button({
         icon: 'settings',
-        label: 'Settings',
+        label: t('menu.settings'),
         disabled: !this.handlers.onSettings,
         onClick: () => this.handlers.onSettings?.(),
       }),
       button({
         icon: 'info',
-        label: 'Credits',
+        label: t('menu.credits'),
         disabled: !this.handlers.onCredits,
         onClick: () => this.handlers.onCredits?.(),
       }),
@@ -116,10 +128,10 @@ export class MainMenuUI {
 
   private renderSlots(mode: 'new' | 'load'): HTMLElement {
     const panel = el('div', 'slot-picker');
-    panel.append(el('h2', 'slot-picker-title', mode === 'new' ? 'Choose a slot for your city' : 'Load a city'));
+    panel.append(el('h2', 'slot-picker-title', t(mode === 'new' ? 'menu.chooseSlot' : 'menu.loadCity')));
     const list = el('div', 'slot-list');
     (this.view.slots ?? []).forEach((info, index) => list.append(this.renderSlot(mode, index + 1, info)));
-    panel.append(list, button({ icon: 'arrowLeft', label: 'Back', onClick: () => this.setMode('main') }));
+    panel.append(list, button({ icon: 'arrowLeft', label: t('menu.back'), onClick: () => this.setMode('main') }));
     return panel;
   }
 
@@ -127,21 +139,28 @@ export class MainMenuUI {
     const card = el('div', 'slot-card panel');
     card.dataset.slot = String(slot);
     const heading = el('div', 'slot-heading');
-    heading.append(el('span', 'slot-number', `Slot ${slot}`));
+    heading.append(el('span', 'slot-number', t('menu.slot', { slot })));
     if (info) heading.append(el('span', 'slot-time', formatAgo(info.savedAt)));
     card.append(heading);
 
     if (!info) {
       card.classList.add('is-empty');
-      card.append(el('div', 'slot-line', 'Empty slot'));
+      card.append(el('div', 'slot-line', t('menu.emptySlot')));
       if (mode === 'new') {
-        card.append(button({ icon: 'plus', label: 'Start here', variant: 'primary', onClick: () => this.handlers.onNewGame(slot) }));
+        card.append(
+          button({
+            icon: 'plus',
+            label: t('menu.startHere'),
+            variant: 'primary',
+            onClick: () => this.handlers.onNewGame(slot),
+          }),
+        );
       }
       return card;
     }
 
     card.append(
-      el('div', 'slot-era', `${ERA_SETTINGS[info.summary.era].name} Era`),
+      el('div', 'slot-era', eraName(info.summary.era)),
       el('div', 'slot-line', slotLine(info)),
     );
     const actions = el('div', 'slot-actions');
@@ -149,20 +168,25 @@ export class MainMenuUI {
       card.classList.add('is-confirming');
       const deleting = mode === 'load';
       actions.append(
-        el('span', 'slot-confirm', deleting ? 'Delete this city for good?' : 'Replace this city?'),
-        button({ label: 'Cancel', onClick: () => this.confirm(null) }),
+        el('span', 'slot-confirm', t(deleting ? 'menu.confirmDelete' : 'menu.confirmOverwrite')),
+        button({ label: t('menu.cancel'), onClick: () => this.confirm(null) }),
         button({
-          label: deleting ? 'Delete' : 'Overwrite',
+          label: t(deleting ? 'menu.delete' : 'menu.overwrite'),
           variant: 'warning',
           onClick: () => (deleting ? this.handlers.onDelete(slot) : this.handlers.onNewGame(slot)),
         }),
       );
     } else if (mode === 'new') {
-      actions.append(button({ label: 'Overwrite', onClick: () => this.confirm(slot) }));
+      actions.append(button({ label: t('menu.overwrite'), onClick: () => this.confirm(slot) }));
     } else {
       actions.append(
-        button({ icon: 'trash', ariaLabel: `Delete slot ${slot}`, className: 'btn-icon', onClick: () => this.confirm(slot) }),
-        button({ icon: 'play', label: 'Load', variant: 'primary', onClick: () => this.handlers.onLoad(slot) }),
+        button({
+          icon: 'trash',
+          ariaLabel: t('menu.deleteSlotAria', { slot }),
+          className: 'btn-icon',
+          onClick: () => this.confirm(slot),
+        }),
+        button({ icon: 'play', label: t('menu.load'), variant: 'primary', onClick: () => this.handlers.onLoad(slot) }),
       );
     }
     card.append(actions);
@@ -177,5 +201,9 @@ export class MainMenuUI {
 
 function slotLine(info: SlotInfo): string {
   const { cityLevel, population, gold } = info.summary;
-  return `Level ${cityLevel} · ${formatAmount(population)} citizens · ${formatAmount(gold)} gold`;
+  return t('menu.slotLine', {
+    level: cityLevel,
+    population: formatAmount(population),
+    gold: formatAmount(gold),
+  });
 }

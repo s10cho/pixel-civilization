@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { button, el, setText } from './dom';
 
 export interface TutorialView {
@@ -19,9 +20,9 @@ export class TutorialCard {
 
   constructor(onNext: () => void, onSkip: () => void) {
     this.element.setAttribute('role', 'status');
-    this.nextButton = button({ label: 'Next', variant: 'primary', onClick: onNext });
+    this.nextButton = button({ label: t('tutorial.next'), variant: 'primary', onClick: onNext });
     const actions = el('div', 'tutorial-actions');
-    actions.append(button({ label: 'Skip tutorial', className: 'btn-link', onClick: onSkip }), this.nextButton);
+    actions.append(button({ label: t('tutorial.skip'), className: 'btn-link', onClick: onSkip }), this.nextButton);
     this.element.append(this.counter, this.title, this.text, actions);
     this.element.hidden = true;
   }
@@ -29,10 +30,10 @@ export class TutorialCard {
   update(view: TutorialView | null): void {
     this.element.hidden = view === null;
     if (!view) return;
-    setText(this.counter, `Tutorial ${view.step} / ${view.total}`);
+    setText(this.counter, t('tutorial.counter', { step: view.step, total: view.total }));
     setText(this.title, view.title);
     setText(this.text, view.text);
     this.nextButton.hidden = !view.canContinue;
-    setText(this.nextButton.querySelector('.btn-label')!, view.step === view.total ? "Let's go" : 'Next');
+    setText(this.nextButton.querySelector('.btn-label')!, t(view.step === view.total ? 'tutorial.letsGo' : 'tutorial.next'));
   }
 }

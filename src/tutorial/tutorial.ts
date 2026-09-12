@@ -1,44 +1,39 @@
-import { buildingName } from '../building/rules';
 import type { BuildingType } from '../building/types';
 
 /** Player actions the tutorial listens for. */
 export type TutorialEvent = { kind: 'toolSelected' | 'placed' | 'selected'; type: BuildingType };
 
 export interface TutorialStep {
-  title: string;
-  text: string;
+  /** Message keys; the text is resolved when shown, so it follows the chosen language. */
+  titleKey: string;
+  textKey: string;
   /** The step completes when this matches an event; steps without it wait for "Next". */
   completes?(event: TutorialEvent): boolean;
 }
 
-const name = (type: BuildingType): string => buildingName(type, 'ancient');
-
 /** First-time guidance: build a home, give it work, find the city's goals. */
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
-    title: 'Welcome, chief!',
-    text: `Your people need homes. Pick the ${name('house')} in the build dock below.`,
+    titleKey: 'tutorial.1.title',
+    textKey: 'tutorial.1.text',
     completes: (e) => e.kind === 'toolSelected' && e.type === 'house',
   },
   {
-    title: `Place the ${name('house')}`,
-    text: 'Tap a free green tile. Citizens move in, walk to work and pay taxes.',
+    titleKey: 'tutorial.2.title',
+    textKey: 'tutorial.2.text',
     completes: (e) => e.kind === 'placed' && e.type === 'house',
   },
   {
-    title: 'Give them work',
-    text: `Build a ${name('shop')}: it employs citizens and earns gold, more so next to homes.`,
+    titleKey: 'tutorial.3.title',
+    textKey: 'tutorial.3.text',
     completes: (e) => e.kind === 'placed' && e.type === 'shop',
   },
   {
-    title: `Your ${name('townHall')}`,
-    text: `Tap the ${name('townHall')} to see your city level and what the next era needs.`,
+    titleKey: 'tutorial.4.title',
+    textKey: 'tutorial.4.text',
     completes: (e) => e.kind === 'selected' && e.type === 'townHall',
   },
-  {
-    title: "You're all set",
-    text: 'Level up to unlock parks, power and research. Expand when you run out of room. Your city keeps working while you are away, for up to 8 hours.',
-  },
+  { titleKey: 'tutorial.5.title', textKey: 'tutorial.5.text' },
 ];
 
 /** Progress through the tutorial steps. */

@@ -1,7 +1,9 @@
 import { audio } from './audio/AudioEngine';
+import { onLocaleChange, resolveLocale, setLocale } from './i18n';
 import { CityScreen } from './screens/CityScreen';
 import { MenuScreen } from './screens/MenuScreen';
 import type { Screen } from './screens/Screen';
+import { loadPreferences } from './storage/preferences';
 import type { LoadedSave } from './storage/saveStore';
 import { openCredits } from './ui/CreditsDialog';
 import { getUiRoot } from './ui/dom';
@@ -34,6 +36,10 @@ function showMenu(): void {
 function showCity(slot: number, save: LoadedSave | null): void {
   show(new CityScreen(viewRoot!, uiRoot, { onExit: showMenu }, { slot, save }));
 }
+
+setLocale(resolveLocale(loadPreferences().locale));
+// A language change rebuilds the current screen's UI in place.
+onLocaleChange(() => current?.rebuildUI?.());
 
 // Browsers allow audio only after a user gesture; any press unlocks (or resumes) it.
 for (const type of ['pointerdown', 'keydown'] as const) {

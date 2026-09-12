@@ -1,4 +1,5 @@
 import type { ResearchId } from '../config/research';
+import { t } from '../i18n';
 import type { ResearchStatus } from '../progression/research';
 import { button, el, setText } from './dom';
 import { formatAmount, formatRate } from './format';
@@ -47,12 +48,12 @@ export class ResearchPanel {
     const badge = el('div', 'panel-badge');
     badge.append(icon('flask'));
     const heading = el('div', 'panel-heading');
-    heading.append(el('h2', 'panel-title', 'Research'), this.rate);
+    heading.append(el('h2', 'panel-title', t('research.title')), this.rate);
     const header = el('header', 'panel-header');
     header.append(
       badge,
       heading,
-      button({ icon: 'close', ariaLabel: 'Close', className: 'btn-icon close-button', onClick: handlers.onClose }),
+      button({ icon: 'close', ariaLabel: t('ui.close'), className: 'btn-icon close-button', onClick: handlers.onClose }),
     );
     this.element.append(header, this.notice, this.list);
     this.element.hidden = true;
@@ -62,9 +63,12 @@ export class ResearchPanel {
     this.element.hidden = !view.open;
     if (!view.open) return;
 
-    setText(this.rate, view.canResearch ? `${formatRate(view.pointsPerSecond)} research points/s` : 'No research yet');
+    setText(
+      this.rate,
+      view.canResearch ? t('research.rate', { rate: formatRate(view.pointsPerSecond) }) : t('research.none'),
+    );
     this.notice.hidden = view.canResearch;
-    setText(this.notice, `Build a ${view.buildingName} to start researching.`);
+    setText(this.notice, t('research.needBuilding', { building: view.buildingName }));
 
     const signature = [
       view.canResearch,
@@ -103,17 +107,17 @@ export class ResearchPanel {
     switch (card.status) {
       case 'available': {
         const start = button({
-          label: 'Start',
+          label: t('research.start'),
           variant: 'primary',
           className: 'research-start',
           disabled: !view.canResearch || view.busy,
           onClick: () => this.handlers.onStart(card.id),
         });
-        const cost = el('span', 'btn-cost', `${formatAmount(card.cost)}g`);
+        const cost = el('span', 'btn-cost', t('format.gold', { amount: formatAmount(card.cost) }));
         cost.classList.toggle('is-unaffordable', view.gold < card.cost);
         start.append(cost);
         foot.append(start);
-        if (view.busy) foot.append(el('span', undefined, 'Another research is running'));
+        if (view.busy) foot.append(el('span', undefined, t('research.busy')));
         break;
       }
       case 'active': {
@@ -126,13 +130,13 @@ export class ResearchPanel {
         break;
       }
       case 'done':
-        foot.append(icon('sparkles'), el('span', undefined, 'Completed'));
+        foot.append(icon('sparkles'), el('span', undefined, t('research.completed')));
         break;
       case 'locked':
-        foot.append(el('span', undefined, `Requires ${card.missing.join(', ')}`));
+        foot.append(el('span', undefined, t('research.requires', { names: card.missing.join(', ') })));
         break;
       case 'excluded':
-        foot.append(el('span', undefined, 'You chose the other path'));
+        foot.append(el('span', undefined, t('research.excluded')));
         break;
       case 'laterEra':
         break;

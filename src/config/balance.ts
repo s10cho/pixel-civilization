@@ -16,11 +16,11 @@ export const ECONOMY = {
 /** Per-era difficulty and reward scaling (design brief §35). */
 export const ERA_SETTINGS: Record<
   EraId,
-  { name: string; costMultiplier: number; outputMultiplier: number; powerDemandMultiplier: number }
+  { costMultiplier: number; outputMultiplier: number; powerDemandMultiplier: number }
 > = {
-  ancient: { name: 'Ancient', costMultiplier: 1, outputMultiplier: 1, powerDemandMultiplier: 1 },
-  medieval: { name: 'Medieval', costMultiplier: 1.6, outputMultiplier: 1.8, powerDemandMultiplier: 1.5 },
-  industrial: { name: 'Industrial', costMultiplier: 2.5, outputMultiplier: 3, powerDemandMultiplier: 2.5 },
+  ancient: { costMultiplier: 1, outputMultiplier: 1, powerDemandMultiplier: 1 },
+  medieval: { costMultiplier: 1.6, outputMultiplier: 1.8, powerDemandMultiplier: 1.5 },
+  industrial: { costMultiplier: 2.5, outputMultiplier: 3, powerDemandMultiplier: 2.5 },
 };
 
 /**
@@ -137,7 +137,6 @@ const NO_OUTPUT = {
 export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   townHall: {
     ...NO_OUTPUT,
-    names: { ancient: "Chief's Hall", medieval: 'Town Hall', industrial: 'City Hall' },
     buildable: false,
     movable: false,
     era: 'ancient',
@@ -150,7 +149,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   house: {
     ...NO_OUTPUT,
-    names: { ancient: 'Hut', medieval: 'Cottage', industrial: 'Row House' },
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -162,7 +160,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   shop: {
     ...NO_OUTPUT,
-    names: { ancient: 'Market Stall', medieval: 'Market', industrial: 'Store' },
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -176,7 +173,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   park: {
     ...NO_OUTPUT,
-    names: { ancient: 'Grove', medieval: 'Garden', industrial: 'City Park' },
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -189,7 +185,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   powerPlant: {
     ...NO_OUTPUT,
-    names: { ancient: 'Windmill', medieval: 'Watermill', industrial: 'Power Station' },
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -202,7 +197,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   researchCenter: {
     ...NO_OUTPUT,
-    names: { ancient: 'Shrine', medieval: 'Library', industrial: 'Laboratory' },
     buildable: true,
     movable: true,
     era: 'ancient',
@@ -216,7 +210,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
   factory: {
     ...NO_OUTPUT,
-    names: { ancient: 'Factory', medieval: 'Factory', industrial: 'Factory' },
     buildable: true,
     movable: true,
     era: 'industrial',

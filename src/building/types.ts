@@ -11,8 +11,6 @@ export type BuildingType =
 
 /** Static, balance-driven description of a building type. Numbers are level-1 values. */
 export interface BuildingDefinition {
-  /** Display name per era: buildings evolve as the civilization advances. */
-  names: Record<EraId, string>;
   /** Whether the player can place this type from the build menu. */
   buildable: boolean;
   /** Whether the player can relocate it (free of charge). */

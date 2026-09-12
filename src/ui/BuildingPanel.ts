@@ -1,13 +1,15 @@
-import { buildingName, canUpgradeFurther, getBuildingOutput, getUpgradeCost } from '../building/rules';
+import { canUpgradeFurther, getBuildingOutput, getUpgradeCost } from '../building/rules';
 import type { Building } from '../building/types';
 import type { Occupancy } from '../citizen/occupancy';
 import { BUILDINGS } from '../config/balance';
+import { t } from '../i18n';
+import { buildingDescription, buildingName, eraName } from '../i18n/names';
 import type { BuildingReport } from '../economy/cityReport';
 import type { EraId } from '../progression/era';
 import { button, el, setText } from './dom';
 import { formatAmount, formatRate } from './format';
 import { BUILDING_ICONS, icon, type IconName } from './icons';
-import { BUILDING_DESCRIPTIONS, effectText } from './messages';
+import { effectText } from './messages';
 
 export interface BuildingPanelHandlers {
   onUpgrade(buildingId: number): void;
@@ -18,9 +20,9 @@ export interface BuildingPanelHandlers {
 
 /** Era status: requirements for the next one and whether the city may advance. */
 export interface EraInfo {
-  current: string;
-  /** Name of the next era, or null in the final era. */
-  next: string | null;
+  current: EraId;
+  /** The next era, or null in the final era. */
+  next: EraId | null;
   requirements: { text: string; met: boolean }[];
   ready: boolean;
 }
@@ -110,12 +112,12 @@ export class BuildingPanel {
     header.append(
       this.badge,
       heading,
-      button({ icon: 'close', ariaLabel: 'Close', className: 'btn-icon close-button', onClick: handlers.onClose }),
+      button({ icon: 'close', ariaLabel: t('ui.close'), className: 'btn-icon close-button', onClick: handlers.onClose }),
     );
 
     this.upgradeButton = button({
       icon: 'arrowUp',
-      label: 'Upgrade',
+      label: t('panel.upgrade'),
       variant: 'success',
       className: 'upgrade-button',
       onClick: () => {
@@ -126,7 +128,7 @@ export class BuildingPanel {
 
     this.moveButton = button({
       icon: 'move',
-      label: 'Move',
+      label: t('panel.move'),
       className: 'move-button',
       onClick: () => {
         if (this.buildingId !== null) handlers.onMove(this.buildingId);
@@ -143,7 +145,7 @@ export class BuildingPanel {
     xpTrack.append(this.cityXpFill);
     this.advanceButton = button({
       icon: 'sparkles',
-      label: 'Advance',
+      label: t('panel.upgrade'),
       variant: 'primary',
       className: 'advance-era-button',
       onClick: handlers.onAdvanceEra,
@@ -169,17 +171,22 @@ export class BuildingPanel {
       this.badgeType = building.type;
     }
     setText(this.title, buildingName(building.type, view.era));
-    setText(this.level, `Level ${building.level} of ${definition.maxLevel}`);
-    setText(this.description, BUILDING_DESCRIPTIONS[building.type]);
+    setText(this.level, t('panel.level', { level: building.level, max: definition.maxLevel }));
+    setText(this.description, buildingDescription(building.type));
 
     this.city.hidden = view.city === null;
     if (view.city) {
       const { level, xp, xpToNext, nextUnlocks } = view.city;
-      setText(this.cityLevel, `City level ${level}`);
-      setText(this.cityXp, xpToNext === null ? 'Max level' : `${formatAmount(xp)} / ${formatAmount(xpToNext)} XP`);
+      setText(this.cityLevel, t('panel.cityLevel', { level }));
+      setText(
+        this.cityXp,
+        xpToNext === null
+          ? t('panel.maxLevel')
+          : t('panel.xp', { xp: formatAmount(xp), next: formatAmount(xpToNext) }),
+      );
       this.cityXpFill.style.width = xpToNext === null ? '100%' : `${Math.min(100, (xp / xpToNext) * 100)}%`;
       this.cityNote.hidden = nextUnlocks.length === 0;
-      setText(this.cityNote, `Next level unlocks: ${nextUnlocks.join(', ')}`);
+      setText(this.cityNote, t('panel.nextUnlocks', { names: nextUnlocks.join(', ') }));
       this.updateEra(view.city.era);
     }
 
@@ -187,26 +194,31 @@ export class BuildingPanel {
     const happinessSign = output.happinessBonus > 0 ? '+' : '';
     const powerSupply = report?.powerSupply ?? output.powerSupply;
     const powerDemand = report?.powerDemand ?? output.powerDemand;
-    showStat(this.stats.gold, gold > 0, `+${formatRate(gold)} gold/s`);
-    showStat(this.stats.capacity, output.populationCapacity > 0, `Houses ${output.populationCapacity}`);
-    showStat(this.stats.jobs, output.jobs > 0, `${output.jobs} jobs`);
+    showStat(this.stats.gold, gold > 0, t('panel.goldPerSecond', { amount: formatRate(gold) }));
+    showStat(this.stats.capacity, output.populationCapacity > 0, t('panel.houses', { count: output.populationCapacity }));
+    showStat(this.stats.jobs, output.jobs > 0, t('panel.jobs', { count: output.jobs }));
     showStat(
       this.stats.happiness,
       output.happinessBonus !== 0,
-      `${happinessSign}${formatRate(output.happinessBonus)} happiness`,
+      t('panel.happiness', { amount: `${happinessSign}${formatRate(output.happinessBonus)}` }),
     );
     showStat(
       this.stats.power,
       powerSupply > 0 || powerDemand > 0,
-      powerSupply > 0 ? `+${formatRate(powerSupply)} power` : `Uses ${formatRate(powerDemand)} power`,
+      powerSupply > 0
+        ? t('panel.powerSupply', { amount: formatRate(powerSupply) })
+        : t('panel.powerDemand', { amount: formatRate(powerDemand) }),
     );
     const efficiency = report?.efficiency ?? 1;
-    showStat(this.stats.efficiency, efficiency < 1, `Working at ${Math.round(efficiency * 100)}%`);
+    showStat(this.stats.efficiency, efficiency < 1, t('panel.efficiency', { percent: Math.round(efficiency * 100) }));
     showStat(
       this.stats.occupancy,
       view.occupancy !== null,
       view.occupancy
-        ? `${view.occupancy.kind === 'residents' ? 'Residents' : 'Workers'} ${view.occupancy.count} / ${view.occupancy.capacity}`
+        ? t(view.occupancy.kind === 'residents' ? 'panel.residents' : 'panel.workers', {
+            count: view.occupancy.count,
+            capacity: view.occupancy.capacity,
+          })
         : '',
     );
     // Buildings without any output (e.g. the Town Hall) get no empty stats box.
@@ -223,7 +235,7 @@ export class BuildingPanel {
     this.upgradeButton.hidden = definition.maxLevel <= 1;
     if (canUpgradeFurther(building)) {
       const cost = getUpgradeCost(building, view.era);
-      setText(this.upgradeCost, `${formatAmount(cost)}g`);
+      setText(this.upgradeCost, t('format.gold', { amount: formatAmount(cost) }));
       this.upgradeCost.hidden = false;
       this.upgradeCost.classList.toggle('is-unaffordable', view.gold < cost);
       this.upgradeButton.disabled = false;
@@ -234,16 +246,16 @@ export class BuildingPanel {
 
     this.moveButton.hidden = !definition.movable;
     this.moveButton.classList.toggle('btn-primary', view.moving);
-    setText(this.moveLabel, view.moving ? 'Cancel move' : 'Move');
+    setText(this.moveLabel, t(view.moving ? 'panel.cancelMove' : 'panel.move'));
     this.actions.hidden = this.upgradeButton.hidden && this.moveButton.hidden;
   }
 
   private updateEra(era: EraInfo): void {
-    setText(this.eraTitle, `${era.current} Era`);
+    setText(this.eraTitle, eraName(era.current));
     this.eraNext.hidden = false;
     setText(
       this.eraNext,
-      era.next ? `To enter the ${era.next} Era:` : 'Your civilization has reached the latest era.',
+      era.next ? t('panel.eraNext', { era: eraName(era.next) }) : t('panel.eraFinal'),
     );
     const signature = era.requirements.map((r) => `${r.met}:${r.text}`).join('|');
     if (signature !== this.renderedRequirements) {
@@ -258,6 +270,6 @@ export class BuildingPanel {
     this.eraRequirements.hidden = era.requirements.length === 0;
     this.advanceButton.hidden = era.next === null;
     this.advanceButton.disabled = !era.ready;
-    if (era.next) setText(this.advanceLabel, `Enter the ${era.next} Era`);
+    if (era.next) setText(this.advanceLabel, t('panel.advance', { era: eraName(era.next) }));
   }
 }

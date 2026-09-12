@@ -2,4 +2,6 @@
 export interface Screen {
   mount(): void;
   unmount(): void;
+  /** Rebuilds the screen's DOM UI, e.g. after the language changed. */
+  rebuildUI?(): void;
 }

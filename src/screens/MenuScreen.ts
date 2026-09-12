@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { deleteSlot, listSlots, loadSlot, type LoadedSave } from '../storage/saveStore';
 import { MainMenuUI } from '../ui/MainMenuUI';
 import type { Screen } from './Screen';
@@ -8,8 +9,6 @@ export interface MenuScreenHandlers {
   onSettings?(): void;
   onCredits?(): void;
 }
-
-const STORAGE_UNAVAILABLE = 'Saving is unavailable in this browser, so progress will not be kept.';
 
 /** Title screen: reads the save slots and starts or resumes a city. */
 export class MenuScreen implements Screen {
@@ -28,12 +27,20 @@ export class MenuScreen implements Screen {
       onDelete: (slot) => {
         deleteSlot(slot)
           .then(() => this.refresh())
-          .catch(() => this.ui?.showNotice('Could not delete the save.'));
+          .catch(() => this.ui?.showNotice(t('menu.deleteFailed')));
       },
       onSettings: this.handlers.onSettings,
       onCredits: this.handlers.onCredits,
     });
     this.refresh();
+  }
+
+  /** Rebuilds the menu in the current language. */
+  rebuildUI(): void {
+    if (!this.ui) return;
+    this.ui.destroy();
+    this.ui = null;
+    this.mount();
   }
 
   unmount(): void {
@@ -44,7 +51,7 @@ export class MenuScreen implements Screen {
   private refresh(): void {
     listSlots()
       .then((slots) => this.ui?.update({ slots, notice: null }))
-      .catch(() => this.ui?.update({ slots: [null, null, null], notice: STORAGE_UNAVAILABLE }));
+      .catch(() => this.ui?.update({ slots: [null, null, null], notice: t('menu.storageUnavailable') }));
   }
 
   private load(slot: number): void {
@@ -54,7 +61,7 @@ export class MenuScreen implements Screen {
         else this.refresh();
       })
       .catch((error: unknown) =>
-        this.ui?.showNotice(`This save could not be loaded: ${error instanceof Error ? error.message : 'unknown error'}.`),
+        this.ui?.showNotice(t('menu.loadFailed', { error: error instanceof Error ? error.message : '?' })),
       );
   }
 }

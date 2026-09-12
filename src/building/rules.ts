@@ -39,10 +39,6 @@ export function getBuildingOutput(building: Building): BuildingOutput {
   };
 }
 
-export function buildingName(type: BuildingType, era: EraId): string {
-  return BUILDINGS[type].names[era];
-}
-
 export function getBuildCost(type: BuildingType, era: EraId): number {
   return Math.ceil(BUILDINGS[type].buildCost * ERA_SETTINGS[era].costMultiplier);
 }

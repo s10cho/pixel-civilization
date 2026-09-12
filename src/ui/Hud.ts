@@ -1,14 +1,15 @@
 import { getMood } from '../economy/happiness';
+import { t, type MessageKey } from '../i18n';
 import type { Resources } from '../simulation/gameState';
 import { el, setText } from './dom';
 import { formatAmount } from './format';
 import { icon, type IconName } from './icons';
 
-const RESOURCES: readonly { key: keyof Resources; label: string; icon: IconName }[] = [
-  { key: 'gold', label: 'Gold', icon: 'coins' },
-  { key: 'population', label: 'Population', icon: 'users' },
-  { key: 'power', label: 'Spare power', icon: 'zap' },
-  { key: 'happiness', label: 'Happiness', icon: 'smile' },
+const RESOURCES: readonly { key: keyof Resources; label: MessageKey; icon: IconName }[] = [
+  { key: 'gold', label: 'hud.gold', icon: 'coins' },
+  { key: 'population', label: 'hud.population', icon: 'users' },
+  { key: 'power', label: 'hud.power', icon: 'zap' },
+  { key: 'happiness', label: 'hud.happiness', icon: 'smile' },
 ];
 
 /** Always-visible top bar with the four core resources. */
@@ -20,9 +21,10 @@ export class Hud {
     for (const resource of RESOURCES) {
       const chip = el('div', 'hud-resource');
       chip.dataset.resource = resource.key;
-      chip.title = resource.label;
+      const label = t(resource.label);
+      chip.title = label;
       const value = el('span', 'hud-value', '0');
-      chip.append(icon(resource.icon), el('span', 'sr-only', resource.label), value);
+      chip.append(icon(resource.icon), el('span', 'sr-only', label), value);
       this.chips.set(resource.key, { chip, value });
       this.element.append(chip);
     }

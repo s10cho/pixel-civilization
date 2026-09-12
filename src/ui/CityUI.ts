@@ -2,6 +2,8 @@ import type { Building, BuildingType } from '../building/types';
 import type { Occupancy } from '../citizen/occupancy';
 import { OFFLINE } from '../config/balance';
 import { ERA_TRANSITION } from '../config/gameConfig';
+import { t } from '../i18n';
+import { eraName } from '../i18n/names';
 import type { ResearchId } from '../config/research';
 import type { BuildingReport } from '../economy/cityReport';
 import type { CityProblem, ProblemKind } from '../economy/problems';
@@ -54,8 +56,8 @@ export interface CityUIView {
   research: ResearchPanelView;
   /** Progress (0..1) of the running research, for the button badge; null when idle. */
   researchProgress: number | null;
-  /** Name of the next era once every requirement is met, else null. */
-  eraReady: string | null;
+  /** The next era once every requirement is met, else null. */
+  eraReady: EraId | null;
   /** Cost of the next territory expansion, or null when fully expanded. */
   expansionCost: number | null;
   /** Short instruction shown above the build dock, or null. */
@@ -103,7 +105,7 @@ export class CityUI {
 
     this.researchButton = button({
       icon: 'flask',
-      label: 'Research',
+      label: t('ui.research'),
       className: 'research-button',
       onClick: handlers.onToggleResearch,
     });
@@ -111,7 +113,7 @@ export class CityUI {
     const topRight = el('div', 'top-right');
     topRight.append(
       this.researchButton,
-      button({ icon: 'menu', label: 'Menu', className: 'menu-button', onClick: handlers.onOpenMenu }),
+      button({ icon: 'menu', label: t('ui.menu'), className: 'menu-button', onClick: handlers.onOpenMenu }),
     );
     const topBar = el('div', 'top-bar');
     topBar.append(topLeft, topRight);
@@ -126,7 +128,7 @@ export class CityUI {
     this.buildBar = new BuildBar(handlers.onSelectTool);
     this.expandButton = button({
       icon: 'expand',
-      label: 'Expand',
+      label: t('ui.expand'),
       variant: 'warning',
       className: 'expand-button',
       onClick: handlers.onExpand,
@@ -149,7 +151,7 @@ export class CityUI {
     const gold = view.resources.gold;
     this.hud.update(view.resources);
     this.eraChip.hidden = view.eraReady === null;
-    if (view.eraReady) setText(this.eraChipLabel, `Ready for the ${view.eraReady} Era`);
+    if (view.eraReady) setText(this.eraChipLabel, t('ui.eraReady', { era: eraName(view.eraReady) }));
     this.problems.update(view.problems);
     this.researchPanel.update(view.research);
     this.researchButton.classList.toggle('btn-primary', view.research.open);
@@ -168,12 +170,12 @@ export class CityUI {
     });
 
     if (view.expansionCost === null) {
-      setText(this.expandLabel, 'Max territory');
+      setText(this.expandLabel, t('ui.maxTerritory'));
       this.expandCost.hidden = true;
       this.expandButton.disabled = true;
     } else {
-      setText(this.expandLabel, 'Expand');
-      setText(this.expandCost, `${formatAmount(view.expansionCost)}g`);
+      setText(this.expandLabel, t('ui.expand'));
+      setText(this.expandCost, t('format.gold', { amount: formatAmount(view.expansionCost) }));
       this.expandCost.hidden = false;
       this.expandCost.classList.toggle('is-unaffordable', gold < view.expansionCost);
       this.expandButton.disabled = false;
@@ -192,11 +194,11 @@ export class CityUI {
   showOfflineReport(report: OfflineReport): void {
     this.offlineModal?.close();
     const body = el('div', 'offline-report');
-    body.append(el('p', 'modal-text', `You were away for ${formatDuration(report.awaySeconds)}. Your city kept working:`));
+    body.append(el('p', 'modal-text', t('offline.away', { duration: formatDuration(report.awaySeconds) })));
     const stats = el('div', 'offline-stats');
     for (const [iconName, value, label] of [
-      ['coins', report.gold, 'gold'],
-      ['users', report.population, 'citizens'],
+      ['coins', report.gold, t('offline.gold')],
+      ['users', report.population, t('offline.citizens')],
     ] as const) {
       const row = el('div', 'offline-stat');
       row.append(icon(iconName), el('strong', 'offline-value', `+${formatAmount(value)}`), el('span', '', label));
@@ -204,13 +206,13 @@ export class CityUI {
     }
     body.append(stats);
     if (report.capped) {
-      body.append(el('p', 'modal-note', `Time away counts for up to ${formatDuration(OFFLINE.maxSeconds)}.`));
+      body.append(el('p', 'modal-note', t('offline.capped', { duration: formatDuration(OFFLINE.maxSeconds) })));
     }
     this.offlineModal = new Modal(this.container, {
-      title: 'Welcome back!',
+      title: t('offline.title'),
       icon: 'clock',
       body,
-      actions: [{ label: 'Collect', variant: 'primary' }],
+      actions: [{ label: t('offline.collect'), variant: 'primary' }],
     });
   }
 
@@ -248,7 +250,7 @@ export class CityUI {
     overlay.style.setProperty('--era-banner-ms', `${ERA_TRANSITION.bannerMs}ms`);
     const banner = el('div', 'era-banner');
     banner.setAttribute('role', 'status');
-    banner.append(el('div', 'era-banner-kicker', 'A new era begins'), this.eraBannerTitle, this.eraBannerSubtitle);
+    banner.append(el('div', 'era-banner-kicker', t('era.banner.kicker')), this.eraBannerTitle, this.eraBannerSubtitle);
     overlay.append(el('div', 'era-flash'), banner);
     return overlay;
   }

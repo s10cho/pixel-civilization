@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 const SUFFIXES = ['', 'K', 'M', 'B', 'T'];
 
 /** Whole-number display with K/M/B/T suffixes for large values (e.g. 1234 -> "1.2K"). */
@@ -18,21 +20,23 @@ export function formatRate(value: number): string {
   return String(Math.round(value * 10) / 10);
 }
 
-/** Compact duration, e.g. "45s", "12m", "2h 14m". */
-export function formatDuration(seconds: number): string {
+/** Duration in the player's language, e.g. "2h 14m" / "2시간 14분". `coarse` drops the minutes. */
+export function formatDuration(seconds: number, options: { coarse?: boolean } = {}): string {
   const total = Math.max(0, Math.floor(seconds));
-  if (total < 60) return `${total}s`;
+  if (total < 60) return t('time.seconds', { n: total });
   const minutes = Math.floor(total / 60);
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return t('time.minutes', { n: minutes });
   const hours = Math.floor(minutes / 60);
-  return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
+  const rest = minutes % 60;
+  if (rest === 0 || options.coarse) return t('time.hours', { n: hours });
+  return t('time.hoursMinutes', { h: hours, m: rest });
 }
 
-/** How long ago an epoch-milliseconds time was, e.g. "just now", "5m ago", "2d ago". */
+/** How long ago an epoch-milliseconds time was, e.g. "5m ago" / "5분 전". */
 export function formatAgo(epochMs: number, now: number = Date.now()): string {
   const seconds = Math.max(0, (now - epochMs) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 86_400) return `${formatDuration(seconds).split(' ')[0]} ago`;
-  const days = Math.floor(seconds / 86_400);
-  return `${days}d ago`;
+  if (seconds < 60) return t('time.justNow');
+  const duration =
+    seconds < 86_400 ? formatDuration(seconds, { coarse: true }) : t('time.days', { n: Math.floor(seconds / 86_400) });
+  return t('time.ago', { duration });
 }
