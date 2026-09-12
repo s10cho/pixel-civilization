@@ -2,15 +2,33 @@ import { t, tKey } from '../i18n';
 import { buildingName } from '../i18n/names';
 import type { Advice } from '../consulting/advice';
 import type { Proposal } from '../consulting/proposals';
+import type { ProjectKind } from '../config/balance';
 import type { EraId } from '../progression/era';
 import { button, el } from './dom';
 import { formatAmount } from './format';
 import { icon } from './icons';
 import { Modal } from './Modal';
 
+export interface ProjectOffer {
+  kind: ProjectKind;
+  /** Tiles the work would cover. */
+  tiles: number;
+  cost: number;
+}
+
+export interface ProjectProgress {
+  kind: ProjectKind;
+  /** 0..1 */
+  progress: number;
+}
+
 export interface ConsultingView {
   advice: readonly Advice[];
   proposals: readonly Proposal[];
+  /** Large works available to commission. */
+  projects: readonly ProjectOffer[];
+  /** Large works already under way. */
+  building: readonly ProjectProgress[];
   era: EraId;
   gold: number;
 }
@@ -18,6 +36,7 @@ export interface ConsultingView {
 export interface ConsultingHandlers {
   onShow(focus: { col: number; row: number }): void;
   onApply(proposal: Proposal): void;
+  onStartProject(kind: ProjectKind): void;
 }
 
 /**
@@ -80,6 +99,51 @@ export function openConsulting(root: HTMLElement, view: ConsultingView, handlers
           variant: 'primary',
           disabled: !affordable,
           onClick: () => handlers.onApply(proposal),
+        }),
+      );
+      card.append(foot);
+      body.append(card);
+    }
+  }
+
+  if (view.building.length > 0) {
+    body.append(el('h3', 'credits-heading', t('consult.underway')));
+    for (const work of view.building) {
+      const row = el('div', 'advice');
+      row.append(
+        icon('hammer', 'advice-icon'),
+        el('span', 'advice-text', tKey(`project.${work.kind}.name`)),
+        el('span', 'project-progress', `${Math.round(work.progress * 100)}%`),
+      );
+      const track = el('div', 'progress');
+      const fill = el('div', 'progress-fill');
+      fill.style.width = `${Math.round(work.progress * 100)}%`;
+      track.append(fill);
+      const wrapper = el('div', 'project-row');
+      wrapper.append(row, track);
+      body.append(wrapper);
+    }
+  }
+
+  if (view.projects.length > 0) {
+    body.append(el('h3', 'credits-heading', t('consult.projects')));
+    for (const offer of view.projects) {
+      const card = el('div', 'proposal');
+      card.append(el('div', 'proposal-title', tKey(`project.${offer.kind}.name`)));
+      card.append(
+        el('div', 'proposal-detail', tKey(`project.${offer.kind}.detail`, { tiles: offer.tiles })),
+      );
+      const foot = el('div', 'proposal-foot');
+      const affordable = view.gold >= offer.cost;
+      const cost = el('span', 'btn-cost', t('format.gold', { amount: formatAmount(offer.cost) }));
+      cost.classList.toggle('is-unaffordable', !affordable);
+      foot.append(
+        cost,
+        button({
+          label: t('consult.commission'),
+          variant: 'primary',
+          disabled: !affordable,
+          onClick: () => handlers.onStartProject(offer.kind),
         }),
       );
       card.append(foot);

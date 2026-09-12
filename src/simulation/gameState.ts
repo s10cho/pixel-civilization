@@ -5,6 +5,8 @@ import { WORLD } from '../config/gameConfig';
 import type { AchievementId } from '../progression/achievements';
 import type { EraId } from '../progression/era';
 import type { ResearchState } from '../progression/research';
+import { initialTerritory, type TileRect } from '../world/territory';
+import type { Project } from './projects';
 
 export interface Resources {
   gold: number;
@@ -27,8 +29,10 @@ export interface GameState {
   /** Highest whole population reached; new highs award XP. */
   peakPopulation: number;
   research: ResearchState;
-  /** Number of territory expansions purchased. */
+  /** Number of territory expansions purchased, which sets the price of the next one. */
   expansionLevel: number;
+  /** The bands of land the city owns; it grows towards a side the player picks. */
+  territory: TileRect[];
   /** How much the advisor does on its own (see simulation/autoGrow). */
   autoLevel: AutoLevel;
   /** How fast the city grows; a comfort setting, never a difficulty. */
@@ -45,6 +49,13 @@ export interface GameState {
   achievements: AchievementId[];
   /** Seconds until the next happy event (see simulation/events.ts). */
   nextEventSeconds: number;
+  /** Large works under construction (see simulation/projects.ts). */
+  projects: Project[];
+  nextProjectId: number;
+  /** Fixes the rocky ridges of this city's map (see world/terrain.ts). */
+  terrainSeed: number;
+  /** Tiles levelled by tunnels or ground works. */
+  clearedTiles: number[];
   /** PRNG state for simulation randomness (see simulation/random.ts). */
   rngState: number;
 }
@@ -65,6 +76,7 @@ export function createInitialState(seed: number = Date.now()): GameState {
     peakPopulation: 0,
     research: { completed: [], active: null },
     expansionLevel: 0,
+    territory: [initialTerritory()],
     // New cities start with the advisor on, so a first-time player always sees progress.
     autoLevel: 'medium',
     growthPace: 'standard',
@@ -75,6 +87,10 @@ export function createInitialState(seed: number = Date.now()): GameState {
     nextEventSeconds: EVENTS.intervalSeconds[0],
     nextBuildingId: 1,
     nextCitizenId: 1,
+    projects: [],
+    nextProjectId: 1,
+    terrainSeed: (seed % 100000) + 1,
+    clearedTiles: [],
     rngState: seed | 0,
   };
 

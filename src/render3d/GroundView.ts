@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ERA_LOOK, WORLD } from '../config/gameConfig';
 import type { EraId } from '../progression/era';
 import type { GameState } from '../simulation/gameState';
+import { isMountain } from '../world/terrain';
 import { isUnlocked } from '../world/territory';
 import { tileToWorld } from './coords';
 import { PALETTE } from './models';
@@ -44,13 +45,17 @@ export class GroundView {
     for (let row = 0; row < WORLD.rows; row++) {
       for (let col = 0; col < WORLD.cols; col++) {
         const checker = (col + row) % 2 === 0;
-        const hex = isUnlocked(state, col, row)
+        const hex = isMountain(state, col, row)
           ? checker
-            ? look.grass
-            : look.grassAlt
-          : checker
-            ? look.locked
-            : look.lockedAlt;
+            ? look.mountain
+            : look.locked
+          : isUnlocked(state, col, row)
+            ? checker
+              ? look.grass
+              : look.grassAlt
+            : checker
+              ? look.locked
+              : look.lockedAlt;
         this.tiles.setColorAt(row * WORLD.cols + col, this.color.setHex(hex));
       }
     }

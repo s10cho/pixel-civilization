@@ -46,7 +46,7 @@ describe('consulting proposals', () => {
     const proposals = getProposals(state, computeCityReport(state));
     expect(proposals.length).toBeGreaterThan(0);
 
-    const area = getUnlockedArea(state.expansionLevel);
+    const area = getUnlockedArea(state);
     for (const proposal of proposals) {
       for (const step of proposal.steps) {
         expect(step.col).toBeGreaterThanOrEqual(area.minCol);
@@ -65,7 +65,7 @@ describe('consulting proposals', () => {
 
   it('suggests more land when the territory is nearly full', () => {
     const state = city();
-    const area = getUnlockedArea(state.expansionLevel);
+    const area = getUnlockedArea(state);
     state.resources.gold = 500_000;
     for (let row = area.minRow; row <= area.maxRow; row++) {
       for (let col = area.minCol; col <= area.maxCol; col++) placeBuilding(state, 'house', col, row);

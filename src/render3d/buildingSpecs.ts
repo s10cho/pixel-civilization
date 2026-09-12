@@ -6,6 +6,15 @@ import type { ModelSpec } from './modelSpec';
  * by hand for the first three eras (see models.ts); everything else describes itself here.
  */
 export const BUILDING_SPECS: Partial<Record<BuildingType, ModelSpec>> = {
+  railway: {
+    width: 0.9,
+    depth: 0.4,
+    height: 0.04,
+    wall: 'woodDark',
+    roof: 'none',
+    platform: 'sidewalk',
+    props: ['rails'],
+  },
   granary: {
     width: 0.6,
     depth: 0.5,

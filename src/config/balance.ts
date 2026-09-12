@@ -1488,6 +1488,20 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     jobs: 5,
     powerDemand: 2,
   },
+  railway: {
+    ...NO_OUTPUT,
+    category: 'transport',
+    // Laid by the railway project, not from the build menu.
+    buildable: false,
+    movable: false,
+    era: 'industrial',
+    cityLevel: 1,
+    buildCost: 0,
+    upgradeBaseCost: 0,
+    maxLevel: 1,
+    happinessBonus: 0.4,
+    goldPerSecond: 0.2,
+  },
   road: {
     ...NO_OUTPUT,
     category: 'transport',
@@ -1515,6 +1529,29 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     pollution: 1,
   },
 };
+
+/**
+ * Large projects (Phase 2 §8): the player commissions them, and then they take time, so the
+ * city visibly has work going on. None of them can fail — they only take a while.
+ */
+export type ProjectKind = 'railway' | 'tunnel' | 'centralPark';
+
+export const PROJECTS: Record<ProjectKind, { cost: number; workSeconds: number; era: EraId; cityLevel: number }> = {
+  centralPark: { cost: 600, workSeconds: 60, era: 'medieval', cityLevel: 5 },
+  tunnel: { cost: 700, workSeconds: 75, era: 'industrial', cityLevel: 6 },
+  railway: { cost: 900, workSeconds: 90, era: 'industrial', cityLevel: 7 },
+};
+
+/** The rocky ridges crossing the map (see world/terrain.ts). */
+export const TERRAIN = {
+  ridges: 3,
+  /** Half-width of a ridge, in tiles. */
+  ridgeWidth: 1.6,
+  /** How much a ridge wanders. */
+  ridgeWobble: 2.2,
+  /** Tiles around the starting territory that are always clear. */
+  clearMargin: 3,
+} as const;
 
 export const TERRITORY = {
   /** Side length (tiles) of the square territory unlocked at the start. */

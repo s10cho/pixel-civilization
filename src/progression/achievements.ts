@@ -1,6 +1,6 @@
 import type { BuildingType } from '../building/types';
 import { ACHIEVEMENTS_REWARD } from '../config/balance';
-import { getMaxExpansionLevel } from '../world/territory';
+import { territoryTileCount } from '../world/territory';
 import type { GameState } from '../simulation/gameState';
 import { eraIndex } from './era';
 
@@ -21,9 +21,10 @@ export type AchievementId =
   | 'medieval'
   | 'industrial'
   | 'expand3'
-  | 'maxTerritory'
+  | 'wideTerritory'
   | 'happiness80'
-  | 'building3';
+  | 'building3'
+  | 'firstRailway';
 
 interface AchievementDefinition {
   /** How far the city has come on this achievement's measure. */
@@ -62,8 +63,17 @@ const DEFINITIONS: Record<AchievementId, AchievementDefinition> = {
   medieval: { measure: (s) => eraIndex(s.era), target: () => 1, rewardGold: ACHIEVEMENTS_REWARD.medium },
   industrial: { measure: (s) => eraIndex(s.era), target: () => 2, rewardGold: ACHIEVEMENTS_REWARD.large },
   expand3: { measure: (s) => s.expansionLevel, target: () => 3, rewardGold: ACHIEVEMENTS_REWARD.medium },
-  maxTerritory: { measure: (s) => s.expansionLevel, target: getMaxExpansionLevel, rewardGold: ACHIEVEMENTS_REWARD.large },
+  wideTerritory: {
+    measure: territoryTileCount,
+    target: () => 900,
+    rewardGold: ACHIEVEMENTS_REWARD.large,
+  },
   happiness80: { measure: (s) => Math.floor(s.resources.happiness), target: () => 80, rewardGold: ACHIEVEMENTS_REWARD.medium },
+  firstRailway: {
+    measure: (s) => countType(s, 'railway'),
+    target: () => 1,
+    rewardGold: ACHIEVEMENTS_REWARD.large,
+  },
   building3: {
     measure: (s) => s.buildings.reduce((best, building) => Math.max(best, building.level), 0),
     target: () => 3,

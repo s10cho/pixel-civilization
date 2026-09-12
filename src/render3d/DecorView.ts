@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ERA_LOOK, WORLD } from '../config/gameConfig';
 import type { EraId } from '../progression/era';
 import type { GameState } from '../simulation/gameState';
+import { isMountain } from '../world/terrain';
 import { isUnlocked } from '../world/territory';
 import { tileToWorld } from './coords';
 import { getDecorGeometry, type DecorKind } from './models';
@@ -67,15 +68,17 @@ export class DecorView {
     const density = ERA_LOOK[era].decorDensity;
     for (let row = 0; row < WORLD.rows; row++) {
       for (let col = 0; col < WORLD.cols; col++) {
-        if (isUnlocked(state, col, row) || hash(col, row, 1) >= density) continue;
-        const kind = pick(MIX[era], hash(col, row, 2));
+        // Ridges are boulders, wherever they are; the wild land outside grows what the era grows.
+        const mountain = isMountain(state, col, row);
+        if (!mountain && (isUnlocked(state, col, row) || hash(col, row, 1) >= density)) continue;
+        const kind = mountain ? 'rock' : pick(MIX[era], hash(col, row, 2));
         const mesh = this.meshes.get(kind)!;
         const index = counts.get(kind)!;
         tileToWorld(col, row, this.position);
         this.position.x += (hash(col, row, 3) - 0.5) * 0.5;
         this.position.z += (hash(col, row, 4) - 0.5) * 0.5;
         this.rotation.setFromAxisAngle(this.up, hash(col, row, 5) * Math.PI * 2);
-        const size = 0.8 + hash(col, row, 6) * 0.5;
+        const size = mountain ? 1.6 + hash(col, row, 6) * 1.1 : 0.8 + hash(col, row, 6) * 0.5;
         this.scale.set(size, size, size);
         mesh.setMatrixAt(index, this.matrix.compose(this.position, this.rotation, this.scale));
         counts.set(kind, index + 1);

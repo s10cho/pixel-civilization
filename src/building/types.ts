@@ -99,6 +99,7 @@ export type BuildingType =
   | 'fireStation'
   | 'policeStation'
   | 'courthouse'
+  | 'railway'
   | 'road'
   | 'factory';
 

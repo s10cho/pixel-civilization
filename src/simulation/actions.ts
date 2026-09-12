@@ -3,7 +3,7 @@ import type { BuildingType } from '../building/types';
 import { BUILDINGS, PROGRESSION } from '../config/balance';
 import { gainXp } from '../progression/level';
 import { checkPlacement, type PlacementError } from '../world/placement';
-import { getExpansionCost } from '../world/territory';
+import { expansionBand, getExpansionCost, type Direction } from '../world/territory';
 import type { GameState } from './gameState';
 
 /** Player-intent operations on the game state. Each validates first and mutates only on success. */
@@ -100,12 +100,14 @@ export function moveBuilding(state: GameState, buildingId: number, col: number, 
   return { ok: true };
 }
 
-export function expandTerritory(state: GameState): ActionResult {
+export function expandTerritory(state: GameState, direction: Direction): ActionResult {
+  const band = expansionBand(state, direction);
+  if (!band) return { ok: false, error: 'maxExpansion' };
   const cost = getExpansionCost(state.expansionLevel);
-  if (cost === null) return { ok: false, error: 'maxExpansion' };
   if (state.resources.gold < cost) return { ok: false, error: 'insufficientGold' };
 
   state.resources.gold -= cost;
+  state.territory.push(band);
   state.expansionLevel++;
   gainXp(state, PROGRESSION.xp.expand);
   return { ok: true };

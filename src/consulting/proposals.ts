@@ -4,8 +4,14 @@ import { CONSULTING } from '../config/balance';
 import type { CityReport } from '../economy/cityReport';
 import { placeBuilding, expandTerritory } from '../simulation/actions';
 import type { GameState } from '../simulation/gameState';
-import { getExpansionCost, getUnlockedArea } from '../world/territory';
-import { freeTileCount, isFree } from './advice';
+import {
+  expansionOptions,
+  freeTiles,
+  getExpansionCost,
+  getUnlockedArea,
+  type Direction,
+} from '../world/territory';
+import { isFree } from './advice';
 
 /** One building the plan would put down. */
 export interface PlanStep {
@@ -29,6 +35,10 @@ export interface Proposal {
   where?: Where;
   /** 1-based index when several candidates are offered for the same thing. */
   candidate?: number;
+  /** For an expansion, the side the land would be added to. */
+  direction?: Direction;
+  /** New tiles an expansion would add. */
+  tiles?: number;
   cost: number;
   steps: PlanStep[];
 }
@@ -91,9 +101,23 @@ export function getProposals(state: GameState, report: CityReport): Proposal[] {
     if (proposals.length >= CONSULTING.candidateSpots) break;
   }
 
-  const expansion = getExpansionCost(state.expansionLevel);
-  if (expansion !== null && freeTileCount(state) <= CONSULTING.roomRunningOutTiles) {
-    proposals.push({ id: 'expand', kind: 'expand', cost: expansion, steps: [] });
+  // Running out of room is a decision for the player: offer every side that still has space.
+  if (freeTiles(state) <= CONSULTING.roomRunningOutTiles) {
+    const cost = getExpansionCost(state.expansionLevel);
+    for (const option of expansionOptions(state).sort((a, b) => b.tiles - a.tiles)) {
+      proposals.push({
+        id: `expand:${option.direction}`,
+        kind: 'expand',
+        cost,
+        steps: [],
+        direction: option.direction,
+        tiles: option.tiles,
+        anchor: {
+          col: Math.round((option.band.minCol + option.band.maxCol) / 2),
+          row: Math.round((option.band.minRow + option.band.maxRow) / 2),
+        },
+      });
+    }
   }
 
   return proposals.slice(0, CONSULTING.maxProposals);
@@ -126,7 +150,7 @@ function usableTemplate(state: GameState, kind: Exclude<ProposalKind, 'expand'>)
  * Housing likes to be near the centre, industry away from it.
  */
 function findSpots(state: GameState, kind: ProposalKind, wanted: number): { col: number; row: number }[] {
-  const area = getUnlockedArea(state.expansionLevel);
+  const area = getUnlockedArea(state);
   const hall = state.buildings.find((building) => building.type === 'townHall');
   const centre = hall ?? { col: (area.minCol + area.maxCol) / 2, row: (area.minRow + area.maxRow) / 2 };
   const spots: { col: number; row: number; score: number }[] = [];
@@ -156,7 +180,7 @@ function findSpots(state: GameState, kind: ProposalKind, wanted: number): { col:
 
 /** Which part of the city a tile is in, for the proposal's name. */
 function whereIn(state: GameState, col: number, row: number): Where {
-  const area = getUnlockedArea(state.expansionLevel);
+  const area = getUnlockedArea(state);
   const midCol = (area.minCol + area.maxCol) / 2;
   const midRow = (area.minRow + area.maxRow) / 2;
   const dc = col - midCol;
@@ -176,7 +200,9 @@ export interface ProposalResult {
 
 /** Carries out an accepted plan, skipping anything that no longer fits. */
 export function applyProposal(state: GameState, proposal: Proposal): ProposalResult {
-  if (proposal.kind === 'expand') return { built: 0, expanded: expandTerritory(state).ok };
+  if (proposal.kind === 'expand') {
+    return { built: 0, expanded: proposal.direction ? expandTerritory(state, proposal.direction).ok : false };
+  }
   let built = 0;
   for (const step of proposal.steps) {
     if (placeBuilding(state, step.type, step.col, step.row).ok) built++;

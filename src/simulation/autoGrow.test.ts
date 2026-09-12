@@ -11,7 +11,7 @@ describe('planAutoAction', () => {
     const action = planAutoAction(state, computeCityReport(state));
     expect(action).toMatchObject({ kind: 'build', type: 'house' });
 
-    const area = getUnlockedArea(state.expansionLevel);
+    const area = getUnlockedArea(state);
     if (action?.kind !== 'build') throw new Error('expected a build');
     expect(action.col).toBeGreaterThanOrEqual(area.minCol);
     expect(action.col).toBeLessThanOrEqual(area.maxCol);

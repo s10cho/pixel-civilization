@@ -65,6 +65,8 @@ export interface EraLook {
   grassAlt: number;
   locked: number;
   lockedAlt: number;
+  /** Rocky ridges (see world/terrain.ts). */
+  mountain: number;
   /** Citizen clothing. */
   shirts: readonly number[];
   /** Share of locked tiles with a tree or rock. */
@@ -83,6 +85,7 @@ export const ERA_LOOK: Record<EraId, EraLook> = {
     grassAlt: 0x74b052,
     locked: 0x3e4a3a,
     lockedAlt: 0x39443a,
+    mountain: 0x6b655c,
     shirts: [0x9b6b3f, 0xb58a52, 0x7a8a4a, 0xc9a26b, 0x8a5a3a],
     decorDensity: 0.55,
   },
@@ -97,6 +100,7 @@ export const ERA_LOOK: Record<EraId, EraLook> = {
     grassAlt: 0x7eaf5d,
     locked: 0x4a4d3c,
     lockedAlt: 0x44473a,
+    mountain: 0x6f6a60,
     shirts: [0x3a6fb0, 0xb04a3a, 0x5a8a4a, 0x8a5aa0, 0xd9b43a],
     decorDensity: 0.4,
   },
@@ -111,6 +115,7 @@ export const ERA_LOOK: Record<EraId, EraLook> = {
     grassAlt: 0x77b163,
     locked: 0x46503f,
     lockedAlt: 0x414a3c,
+    mountain: 0x6d6a64,
     shirts: [0x2f6fd0, 0xe0533f, 0x2fa46a, 0x7a52c8, 0xf0a72a],
     decorDensity: 0.35,
   },
@@ -125,6 +130,7 @@ export const ERA_LOOK: Record<EraId, EraLook> = {
     grassAlt: 0x86a063,
     locked: 0x514c42,
     lockedAlt: 0x4b463d,
+    mountain: 0x6a6459,
     shirts: [0x3b3f4a, 0x5a4a3a, 0x2f4a6a, 0x6a6a6a, 0x8a3a3a],
     decorDensity: 0.25,
   },

@@ -2,7 +2,16 @@ import { audio } from '../audio/AudioEngine';
 import { BUILDABLE_TYPES, getBuildCost, getUnlockState } from '../building/rules';
 import type { Building, BuildingType } from '../building/types';
 import { getOccupancy } from '../citizen/occupancy';
-import { AUTO_GROW, AUTO_LEVELS, BUILDINGS, GROWTH_PACE, OFFLINE, type AutoLevel } from '../config/balance';
+import {
+  AUTO_GROW,
+  AUTO_LEVELS,
+  BUILDINGS,
+  GROWTH_PACE,
+  OFFLINE,
+  PROJECTS,
+  type AutoLevel,
+  type ProjectKind,
+} from '../config/balance';
 import { AUTO_QUALITY, CAMERA, ERA_TRANSITION, QUALITY, SAVE, SIMULATION, type QualityLevel } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import { getAdvice } from '../consulting/advice';
@@ -21,6 +30,7 @@ import { BuildingView } from '../render3d/BuildingView';
 import { CameraRig } from '../render3d/CameraRig';
 import { CitizenView } from '../render3d/CitizenView';
 import type { TileCoord } from '../render3d/coords';
+import { ConstructionView } from '../render3d/ConstructionView';
 import { DecorView } from '../render3d/DecorView';
 import { GroundView } from '../render3d/GroundView';
 import { FrameRateMonitor, lowerQuality, resolveQualityLevel } from '../render3d/quality';
@@ -39,6 +49,13 @@ import {
 import { createInitialState, type GameState } from '../simulation/gameState';
 import { planAutoAction, type AutoAction } from '../simulation/autoGrow';
 import { maybeTriggerEvent, type CityEvent } from '../simulation/events';
+import {
+  advanceProjects,
+  isProjectUnlocked,
+  planProject,
+  startProject,
+  type Project,
+} from '../simulation/projects';
 import { applyOfflineProgress } from '../simulation/offline';
 import { tickSimulation } from '../simulation/tick';
 import { saveSlot, type LoadedSave } from '../storage/saveStore';
@@ -52,6 +69,7 @@ import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
 import { openAchievements } from '../ui/AchievementsDialog';
 import { openHelp } from '../ui/HelpDialog';
 import { openConsulting } from '../ui/ConsultingDialog';
+import { openExpand } from '../ui/ExpandDialog';
 import { openHistory } from '../ui/HistoryDialog';
 import { openSettings } from '../ui/SettingsDialog';
 import type { TutorialView } from '../ui/TutorialCard';
@@ -59,7 +77,15 @@ import { loadPreferences, savePreferences, type Preferences } from '../storage/p
 import { Tutorial, TUTORIAL_STEPS, type TutorialEvent } from '../tutorial/tutorial';
 import { getBuildingAt } from '../world/placement';
 import { roadConnections } from '../world/roads';
-import { getExpansionCost, getUnlockedArea } from '../world/territory';
+import { isMountain } from '../world/terrain';
+import {
+  canExpand,
+  expansionOptions,
+  getExpansionCost,
+  getUnlockedArea,
+  type Direction,
+  type TileRect,
+} from '../world/territory';
 import type { Screen } from './Screen';
 
 export interface CityScreenHandlers {
@@ -119,6 +145,7 @@ export class CityScreen implements Screen {
   private buildings!: BuildingView;
   private decor!: DecorView;
   private smoke!: SmokeView;
+  private construction!: ConstructionView;
   private citizens!: CitizenView;
   private markers!: TileMarkers;
   private picker!: TilePicker;
@@ -175,6 +202,7 @@ export class CityScreen implements Screen {
   private achievementsModal: Modal | null = null;
   private historyModal: Modal | null = null;
   private consultingModal: Modal | null = null;
+  private expandModal: Modal | null = null;
   /** Seconds since the advisor's last action. */
   private autoGrowSeconds = 0;
   /** The level the top-bar button switches back to. */
@@ -201,15 +229,17 @@ export class CityScreen implements Screen {
     this.buildings = new BuildingView(this.stage.scene);
     this.decor = new DecorView(this.stage.scene);
     this.smoke = new SmokeView(this.stage.scene, quality.smokePuffs);
+    this.construction = new ConstructionView(this.stage.scene);
     this.citizens = new CitizenView(this.stage.scene, quality.renderedCitizens);
     this.markers = new TileMarkers(this.stage.scene);
     this.applyEnvironment(this.state.era);
     this.syncBuildings();
+    this.construction.sync(this.state.projects);
     this.citizens.sync(this.state.citizens);
     audio.playMusic(this.state.era);
 
     this.rig = new CameraRig(this.stage.camera, this.stage.canvas);
-    this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
+    this.rig.focusArea(getUnlockedArea(this.state));
     this.picker = new TilePicker(this.stage.camera, this.stage.canvas, this.buildings);
 
     this.ui = this.createUI();
@@ -264,6 +294,7 @@ export class CityScreen implements Screen {
     this.achievementsModal?.close();
     this.historyModal?.close();
     this.consultingModal?.close();
+    this.expandModal?.close();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('resize', this.onResize);
@@ -274,6 +305,7 @@ export class CityScreen implements Screen {
     this.buildings.dispose();
     this.decor.dispose();
     this.smoke.dispose();
+    this.construction.dispose();
     this.citizens.dispose();
     this.ui.destroy();
     // Removing the canvas also drops its pointer listeners.
@@ -294,6 +326,8 @@ export class CityScreen implements Screen {
       this.report = tickSimulation(this.state, SIMULATION.tickSeconds);
       const event = maybeTriggerEvent(this.state, this.report, SIMULATION.tickSeconds);
       if (event) this.announceEvent(event);
+      const finished = advanceProjects(this.state, SIMULATION.tickSeconds);
+      if (finished.length > 0) this.completeProjects(finished);
       this.accumulator -= SIMULATION.tickSeconds;
       ticked = true;
     }
@@ -712,23 +746,71 @@ export class CityScreen implements Screen {
       {
         advice: getAdvice(this.state, this.report),
         proposals: getProposals(this.state, this.report),
+        projects: this.projectOffers(),
+        building: this.state.projects.map((project) => ({
+          kind: project.kind,
+          progress: Math.min(1, project.progress / project.work),
+        })),
         era: this.state.era,
         gold: this.state.resources.gold,
       },
       {
         onShow: (focus) => {
           this.consultingModal?.close();
+    this.expandModal?.close();
           this.rig.focusTile(focus.col, focus.row);
           this.select(focus);
         },
         onApply: (proposal) => this.acceptProposal(proposal),
+        onStartProject: (kind) => this.commissionProject(kind),
       },
     );
+  }
+
+  /** Large works the city could commission right now. */
+  private projectOffers(): { kind: ProjectKind; tiles: number; cost: number }[] {
+    const offers: { kind: ProjectKind; tiles: number; cost: number }[] = [];
+    for (const kind of Object.keys(PROJECTS) as ProjectKind[]) {
+      if (!isProjectUnlocked(this.state, kind)) continue;
+      if (this.state.projects.some((project) => project.kind === kind)) continue;
+      const plan = planProject(this.state, kind);
+      if (plan) offers.push({ kind, tiles: plan.tiles.length, cost: plan.cost });
+    }
+    return offers;
+  }
+
+  private commissionProject(kind: ProjectKind): void {
+    this.consultingModal?.close();
+    const plan = planProject(this.state, kind);
+    if (!plan || !startProject(this.state, plan)) {
+      this.fail(t('consult.tooExpensive'));
+      return;
+    }
+    audio.play('expand');
+    this.construction.sync(this.state.projects);
+    this.ui.showMessage(t('consult.started', { name: tKey(`project.${kind}.name`) }));
+    this.rig.focusTile(plan.tiles[0].col, plan.tiles[0].row);
+    this.refreshUI();
+  }
+
+  /** A project has finished: the city gets its railway, tunnel or park. */
+  private completeProjects(finished: readonly Project[]): void {
+    this.onCityChanged();
+    this.ground.sync(this.state, this.displayEra);
+    this.decor.sync(this.state, this.displayEra);
+    this.construction.sync(this.state.projects);
+    audio.play('levelUp');
+    for (const project of finished) {
+      this.ui.showMessage(t('consult.finished', { name: tKey(`project.${project.kind}.name`) }));
+      for (const tile of project.tiles) this.popBuilding(getBuildingAt(this.state, tile.col, tile.row)?.id);
+    }
+    this.refreshUI();
   }
 
   /** Carries out a plan the player accepted. */
   private acceptProposal(proposal: Proposal): void {
     this.consultingModal?.close();
+    this.expandModal?.close();
     if (this.state.resources.gold < proposal.cost) {
       this.fail(t('consult.tooExpensive'));
       return;
@@ -809,7 +891,7 @@ export class CityScreen implements Screen {
         ERA_TRANSITION.maxSpreadSeconds / Math.max(1, order.length - 1),
       ),
     };
-    this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
+    this.rig.focusArea(getUnlockedArea(this.state));
     this.ui.playEraTransition(eraName(result.era), eraTagline(result.era));
     this.onCityChanged();
     this.refreshUI();
@@ -949,10 +1031,41 @@ export class CityScreen implements Screen {
     this.refreshUI();
   }
 
+  /** Expanding asks which way to grow: the shape of the city is the player's decision. */
   private expand(): void {
-    const result = expandTerritory(this.state);
-    if (result.ok) this.onTerritoryChanged();
-    else this.fail(actionErrorText(result.error));
+    if (this.expandModal?.isOpen) return;
+    const options = expansionOptions(this.state);
+    if (options.length === 0) {
+      this.fail(actionErrorText('maxExpansion'));
+      return;
+    }
+    const sides = [...options]
+      .sort((a, b) => b.tiles - a.tiles)
+      .map((option, index) => ({
+        direction: option.direction,
+        tiles: option.tiles,
+        buildable: buildableTiles(this.state, option.band),
+        recommended: index === 0,
+      }));
+    audio.play('select');
+    this.expandModal = openExpand(
+      this.uiRoot,
+      { cost: getExpansionCost(this.state.expansionLevel), gold: this.state.resources.gold, sides },
+      (direction) => {
+        this.expandModal?.close();
+        this.growTowards(direction);
+      },
+    );
+  }
+
+  private growTowards(direction: Direction): void {
+    const result = expandTerritory(this.state, direction);
+    if (result.ok) {
+      this.onTerritoryChanged();
+      this.ui.showMessage(t('expand.done', { where: tKey(`where.${direction}`) }));
+    } else {
+      this.fail(actionErrorText(result.error));
+    }
     this.refreshUI();
   }
 
@@ -962,7 +1075,7 @@ export class CityScreen implements Screen {
     this.decor.sync(this.state, this.displayEra);
     audio.play('expand');
     // Auto focus: frame the newly unlocked territory.
-    this.rig.focusArea(getUnlockedArea(this.state.expansionLevel));
+    this.rig.focusArea(getUnlockedArea(this.state));
     this.announceProgress();
   }
 
@@ -1045,7 +1158,7 @@ export class CityScreen implements Screen {
         return true;
       }
       case 'expand': {
-        if (!expandTerritory(this.state).ok) return false;
+        if (!expandTerritory(this.state, action.direction).ok) return false;
         if (announce) {
           this.onTerritoryChanged();
           this.ui.showMessage(t('auto.expanded'));
@@ -1289,13 +1402,24 @@ export class CityScreen implements Screen {
       research: this.researchView(),
       researchProgress: active ? active.progress / RESEARCH[active.id].points : null,
       eraReady: eraProgress?.ready ? eraProgress.next : null,
-      expansionCost: getExpansionCost(this.state.expansionLevel),
+      expansionCost: canExpand(this.state) ? getExpansionCost(this.state.expansionLevel) : null,
       hint: this.hintText(),
       tutorial: this.tutorialView(),
       autoLevel: this.state.autoLevel,
       adviceCount: getAdvice(this.state, this.report).length,
     });
   }
+}
+
+/** Tiles in a band that are not rocky ground. */
+function buildableTiles(state: GameState, band: TileRect): number {
+  let total = 0;
+  for (let row = band.minRow; row <= band.maxRow; row++) {
+    for (let col = band.minCol; col <= band.maxCol; col++) {
+      if (!isMountain(state, col, row)) total++;
+    }
+  }
+  return total;
 }
 
 function distance(building: Building, from: Building | undefined): number {

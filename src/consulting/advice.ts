@@ -4,8 +4,8 @@ import { CONSULTING } from '../config/balance';
 import type { CityReport } from '../economy/cityReport';
 import { hasResearchBuilding } from '../progression/research';
 import type { GameState } from '../simulation/gameState';
-import { getExpansionCost, getUnlockedArea } from '../world/territory';
-import { getBuildingAt } from '../world/placement';
+import { canExpand, freeTiles } from '../world/territory';
+import { canBuildOn } from '../world/placement';
 
 /** Things the consulting service notices about the city. */
 export type AdviceId =
@@ -31,13 +31,6 @@ export interface Advice {
 
 const count = (state: GameState, type: BuildingType): number =>
   state.buildings.reduce((total, building) => total + (building.type === type ? 1 : 0), 0);
-
-/** How many tiles inside the territory are still free. */
-export function freeTileCount(state: GameState): number {
-  const area = getUnlockedArea(state.expansionLevel);
-  const tiles = (area.maxCol - area.minCol + 1) * (area.maxRow - area.minRow + 1);
-  return tiles - state.buildings.length;
-}
 
 /**
  * Reads the city and returns what is worth mentioning, most pressing first. Advice is never a
@@ -82,8 +75,8 @@ export function getAdvice(state: GameState, report: CityReport): Advice[] {
 
   if (available('researchCenter') && !hasResearchBuilding(state)) advice.push({ id: 'needResearch' });
 
-  const free = freeTileCount(state);
-  if (free <= CONSULTING.roomRunningOutTiles && getExpansionCost(state.expansionLevel) !== null) {
+  const free = freeTiles(state);
+  if (free <= CONSULTING.roomRunningOutTiles && canExpand(state)) {
     advice.push({ id: 'roomRunningOut', amount: free });
   }
 
@@ -101,9 +94,7 @@ function firstOfType(state: GameState, type: BuildingType): { col: number; row: 
   return building && { col: building.col, row: building.row };
 }
 
-/** Whether a tile is inside the territory and empty. */
+/** Whether a plan could put a building on this tile. */
 export function isFree(state: GameState, col: number, row: number): boolean {
-  const area = getUnlockedArea(state.expansionLevel);
-  if (col < area.minCol || col > area.maxCol || row < area.minRow || row > area.maxRow) return false;
-  return !getBuildingAt(state, col, row);
+  return canBuildOn(state, col, row);
 }

@@ -1,6 +1,6 @@
 import type { EraId } from './era';
 import type { GameState } from '../simulation/gameState';
-import { getUnlockedArea } from '../world/territory';
+import { initialTerritory, territoryTileCount } from '../world/territory';
 import { ACHIEVEMENT_IDS } from './achievements';
 
 /**
@@ -12,7 +12,7 @@ export interface CityHistory {
   days: number;
   population: { first: number; now: number };
   buildings: { first: number; now: number };
-  /** Side length of the territory square. */
+  /** Tiles of land the city owns. */
   territory: { first: number; now: number };
   roads: { first: number; now: number };
   /** Each era the city has lived through, with the day it started. */
@@ -22,12 +22,6 @@ export interface CityHistory {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Side length of the territory square at an expansion level. */
-const side = (expansionLevel: number): number => {
-  const area = getUnlockedArea(expansionLevel);
-  return Math.max(area.maxCol - area.minCol + 1, area.maxRow - area.minRow + 1);
-};
 
 /** Every city starts with its town hall and nothing else. */
 const FIRST_BUILDINGS = 1;
@@ -39,7 +33,7 @@ export function getCityHistory(state: GameState, now: number = Date.now()): City
     days: Math.max(1, Math.floor((now - state.foundedAt) / DAY_MS) + 1),
     population: { first: 0, now: Math.floor(state.resources.population) },
     buildings: { first: FIRST_BUILDINGS, now: state.buildings.length },
-    territory: { first: side(0), now: side(state.expansionLevel) },
+    territory: { first: territoryTileCount({ territory: [initialTerritory()] }), now: territoryTileCount(state) },
     roads: { first: 0, now: roads },
     eras: state.eraHistory.map((entry) => ({
       era: entry.era,

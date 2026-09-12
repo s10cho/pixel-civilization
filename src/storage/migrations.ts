@@ -1,4 +1,7 @@
+import { TERRITORY } from '../config/balance';
+import { WORLD } from '../config/gameConfig';
 import { createInitialState, type GameState } from '../simulation/gameState';
+import type { TileRect } from '../world/territory';
 
 /** Bump when the saved GameState shape changes, and add a step to `migrateState`. */
 export const SAVE_VERSION = 2;
@@ -25,6 +28,16 @@ export function migrateState(version: number, raw: unknown): GameState {
     stored.eraHistory = [{ era: stored.era ?? 'ancient', at: stored.foundedAt }];
   }
 
+  if (!Array.isArray(stored.projects)) stored.projects = [];
+  if (typeof stored.nextProjectId !== 'number') stored.nextProjectId = 1;
+  if (typeof stored.terrainSeed !== 'number') stored.terrainSeed = 1;
+  if (!Array.isArray(stored.clearedTiles)) stored.clearedTiles = [];
+
+  // Before Phase 2 the territory was a centred square derived from the expansion count.
+  if (!Array.isArray(stored.territory) || stored.territory.length === 0) {
+    stored.territory = [legacyTerritory(stored.expansionLevel ?? 0)];
+  }
+
   // v1 had a single on/off advisor flag; v2 has levels and a growth pace.
   const legacy = stored as { autoGrow?: boolean };
   if (version < 2 && stored.autoLevel === undefined) {
@@ -41,4 +54,16 @@ export function migrateState(version: number, raw: unknown): GameState {
     achievements: Array.isArray(stored.achievements) ? stored.achievements : [],
     citizens: Array.isArray(stored.citizens) ? stored.citizens : [],
   };
+}
+
+/** The centred square a pre-Phase-2 save owned at this expansion count. */
+function legacyTerritory(expansionLevel: number): TileRect {
+  const size = Math.min(
+    TERRITORY.initialSize + expansionLevel * 2 * TERRITORY.expansionStep,
+    WORLD.cols,
+    WORLD.rows,
+  );
+  const minCol = Math.floor((WORLD.cols - size) / 2);
+  const minRow = Math.floor((WORLD.rows - size) / 2);
+  return { minCol, minRow, maxCol: minCol + size - 1, maxRow: minRow + size - 1 };
 }

@@ -1,8 +1,9 @@
 import type { Building } from '../building/types';
 import type { GameState } from '../simulation/gameState';
+import { isMountain } from './terrain';
 import { isInsideWorld, isUnlocked } from './territory';
 
-export type PlacementError = 'outOfBounds' | 'locked' | 'occupied';
+export type PlacementError = 'outOfBounds' | 'locked' | 'occupied' | 'mountain';
 
 export function getBuildingAt(state: GameState, col: number, row: number): Building | undefined {
   return state.buildings.find((b) => b.col === col && b.row === row);
@@ -13,5 +14,11 @@ export function checkPlacement(state: GameState, col: number, row: number): Plac
   if (!isInsideWorld(col, row)) return 'outOfBounds';
   if (!isUnlocked(state, col, row)) return 'locked';
   if (getBuildingAt(state, col, row)) return 'occupied';
+  if (isMountain(state, col, row)) return 'mountain';
   return null;
+}
+
+/** Whether something could be built here right now. */
+export function canBuildOn(state: GameState, col: number, row: number): boolean {
+  return checkPlacement(state, col, row) === null;
 }

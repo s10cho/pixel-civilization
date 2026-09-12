@@ -4,15 +4,21 @@ import { AUTO_GROW, AUTO_LEVELS, BUILDINGS } from '../config/balance';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
 import type { CityReport } from '../economy/cityReport';
 import { getResearchStatus, hasResearchBuilding } from '../progression/research';
-import { getBuildingAt } from '../world/placement';
-import { getExpansionCost, getUnlockedArea } from '../world/territory';
+import { canBuildOn, getBuildingAt } from '../world/placement';
+import {
+  expansionOptions,
+  freeTiles,
+  getExpansionCost,
+  getUnlockedArea,
+  type Direction,
+} from '../world/territory';
 import type { GameState } from './gameState';
 
 /** One thing the advisor would like to do next. */
 export type AutoAction =
   | { kind: 'build'; type: BuildingType; col: number; row: number }
   | { kind: 'upgrade'; buildingId: number }
-  | { kind: 'expand' }
+  | { kind: 'expand'; direction: Direction }
   | { kind: 'research'; id: ResearchId };
 
 /**
@@ -34,14 +40,11 @@ export function planAutoAction(state: GameState, report: CityReport): AutoAction
     if (tile) return { kind: 'build', type: wanted, col: tile.col, row: tile.row };
   }
 
-  const expansion = getExpansionCost(state.expansionLevel);
-  if (
-    permissions.allowExpand &&
-    expansion !== null &&
-    expansion <= budget &&
-    freeTiles(state) <= AUTO_GROW.expandWhenFreeTilesAtMost
-  ) {
-    return { kind: 'expand' };
+  if (permissions.allowExpand && freeTiles(state) <= AUTO_GROW.expandWhenFreeTilesAtMost) {
+    const expansion = getExpansionCost(state.expansionLevel);
+    // Grow towards whichever side offers the most new land.
+    const best = expansionOptions(state).sort((a, b) => b.tiles - a.tiles)[0];
+    if (best && expansion <= budget) return { kind: 'expand', direction: best.direction };
   }
 
   if (permissions.allowResearch) {
@@ -90,14 +93,16 @@ function pickBuildingType(state: GameState, report: CityReport): BuildingType | 
 
 /** The free tile that keeps the city compact and puts neighbours where they help. */
 function pickTile(state: GameState, type: BuildingType): { col: number; row: number } | null {
-  const area = getUnlockedArea(state.expansionLevel);
+  const area = getUnlockedArea(state);
   const hall = state.buildings.find((building) => building.type === 'townHall');
   let best: { col: number; row: number } | null = null;
   let bestScore = -Infinity;
 
   for (let row = area.minRow; row <= area.maxRow; row++) {
     for (let col = area.minCol; col <= area.maxCol; col++) {
-      if (getBuildingAt(state, col, row)) continue;
+      // The territory is a set of bands now, so the box around it includes land the city
+      // does not own, and ridges cannot be built on either.
+      if (!canBuildOn(state, col, row)) continue;
       const distance = hall ? Math.hypot(col - hall.col, row - hall.row) : 0;
       const score = neighbourScore(state, type, col, row) - distance;
       if (score > bestScore) {
@@ -141,12 +146,6 @@ function countByType(state: GameState): Record<BuildingType, number> {
   ) as Record<BuildingType, number>;
   for (const building of state.buildings) counts[building.type]++;
   return counts;
-}
-
-function freeTiles(state: GameState): number {
-  const area = getUnlockedArea(state.expansionLevel);
-  const tiles = (area.maxCol - area.minCol + 1) * (area.maxRow - area.minRow + 1);
-  return tiles - state.buildings.length;
 }
 
 /** The cheapest research the city could start right now. */
