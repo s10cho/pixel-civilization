@@ -8,7 +8,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    // Phaser alone is ~1.2 MB minified; silence the default 500 kB warning.
-    chunkSizeWarningLimit: 2000,
+    // three.js is most of the bundle (~700 kB minified); silence the default 500 kB warning.
+    chunkSizeWarningLimit: 1200,
   },
 });
