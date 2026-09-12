@@ -1,7 +1,7 @@
 # Pixel Civilization
 
 A calm idle civilization builder in the browser: grow a tiny settlement through the Ancient,
-Medieval and Industrial eras. The city is a low-poly isometric 3D scene (Three.js) with a
+Medieval, Industrial and Modern eras. The city is a low-poly isometric 3D scene (Three.js) with a
 card-style DOM interface, generative music and synthesized sound — no image or audio assets.
 Nothing in the game can be lost or destroyed: shortages only slow the city down gently.
 
@@ -9,9 +9,14 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
 
 ## Features
 
-- **Build and grow**: twelve kinds of building — homes, farms, shops, workshops, parks, wells,
-  inns, power, research, monuments and factories — each with its own look in every era.
-  Citizens are simulated: they move in, walk to work and to parks, and show their mood.
+- **Build and grow**: a hundred kinds of building, grouped into category tabs (homes, food,
+  trade, industry, power, utilities, transport, leisure, culture, science, civic) and unlocked
+  by era and city level. The oldest twelve are renamed and remodelled in every era; later eras
+  bring their own — from pottery kilns and bathhouses to steel mills, subway stations and
+  space centers. Citizens are simulated: they move in, walk to work and to parks, and show
+  their mood.
+- **Roads**: cheap paving that connects to its neighbours, with trade and industry beside it
+  earning more.
 - **City management**: power supply and demand, staffing, adjacency bonuses (shops next to
   homes, parks around homes, factories near power), pollution and happiness. Problems are
   flagged in the HUD and tapping one focuses the camera on it.
@@ -79,8 +84,8 @@ src/
   tutorial/        first-time tutorial steps
   storage/         IndexedDB save slots and migrations, localStorage preferences
   audio/           WebAudio engine: generative per-era music, sound effects
-  render3d/        Three.js view: stage, camera, models, ground, buildings, scenery, citizens,
-                   smoke, picking, quality
+  render3d/        Three.js view: stage, camera, hand-made and data-driven models, ground,
+                   buildings, scenery, citizens, smoke, picking, quality
   screens/         MenuScreen, CityScreen (input, simulation loop, view/UI sync)
   ui/              DOM overlay: HUD, build dock, panels, research, modals, main menu
 docs/              design notes

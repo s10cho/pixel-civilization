@@ -33,7 +33,8 @@ import wheat from 'lucide-static/icons/wheat.svg?raw';
 import volume from 'lucide-static/icons/volume-2.svg?raw';
 import close from 'lucide-static/icons/x.svg?raw';
 import zap from 'lucide-static/icons/zap.svg?raw';
-import type { BuildingType } from '../building/types';
+import { BUILDINGS } from '../config/balance';
+import type { BuildingCategory, BuildingType } from '../building/types';
 
 /** Rounded line icons from Lucide (ISC), bundled as inline SVG strings. */
 const ICONS = {
@@ -76,21 +77,36 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS;
 
-export const BUILDING_ICONS: Record<BuildingType, IconName> = {
+/** Default icon per build-menu category, so every building has one without extra work. */
+const CATEGORY_ICONS: Record<BuildingCategory, IconName> = {
+  housing: 'home',
+  food: 'wheat',
+  commerce: 'store',
+  industry: 'hammer',
+  energy: 'zap',
+  utility: 'droplets',
+  transport: 'route',
+  leisure: 'tree',
+  culture: 'flag',
+  science: 'flask',
+  civic: 'building',
+};
+
+/** Buildings distinctive enough to deserve their own icon. */
+const ICON_OVERRIDES: Partial<Record<BuildingType, IconName>> = {
   townHall: 'building',
-  house: 'home',
-  farm: 'wheat',
-  shop: 'store',
-  workshop: 'hammer',
-  park: 'tree',
-  well: 'droplets',
   inn: 'bed',
-  powerPlant: 'zap',
-  researchCenter: 'flask',
+  factory: 'factory',
   monument: 'flag',
   road: 'route',
-  factory: 'factory',
 };
+
+export const BUILDING_ICONS = Object.fromEntries(
+  (Object.keys(BUILDINGS) as BuildingType[]).map((type) => [
+    type,
+    ICON_OVERRIDES[type] ?? CATEGORY_ICONS[BUILDINGS[type].category],
+  ]),
+) as Record<BuildingType, IconName>;
 
 /** Inline SVG icon; coloured through CSS `color` (the SVGs stroke with currentColor). */
 export function icon(name: IconName, className?: string): HTMLSpanElement {

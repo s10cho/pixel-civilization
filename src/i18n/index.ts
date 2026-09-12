@@ -65,6 +65,11 @@ export function t(key: MessageKey, params?: Record<string, string | number>): st
   });
 }
 
+/** Whether a runtime-built key exists at all (the English catalog defines them). */
+export function hasMessage(key: string): boolean {
+  return key in en;
+}
+
 /** For keys built at runtime (e.g. `building.house.ancient`). */
 export function tKey(key: string, params?: Record<string, string | number>): string {
   return t(key as MessageKey, params);

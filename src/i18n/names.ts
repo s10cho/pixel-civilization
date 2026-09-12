@@ -1,11 +1,15 @@
 import type { BuildingType } from '../building/types';
 import type { ResearchId } from '../config/research';
 import type { EraId } from '../progression/era';
-import { t, tKey } from './index';
+import { hasMessage, t, tKey } from './index';
 
-/** Display name of a building type in an era (buildings are renamed as the city advances). */
+/**
+ * Display name of a building type. The oldest types are renamed as the city advances, so they
+ * have a name per era; buildings that belong to a single era just have one name.
+ */
 export function buildingName(type: BuildingType, era: EraId): string {
-  return tKey(`building.${type}.${era}`);
+  const eraKey = `building.${type}.${era}`;
+  return tKey(hasMessage(eraKey) ? eraKey : `building.${type}.name`);
 }
 
 export function buildingDescription(type: BuildingType): string {
