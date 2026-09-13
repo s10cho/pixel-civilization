@@ -18,7 +18,9 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
 - **Roads**: cheap paving that connects to its neighbours, with trade and industry beside it
   earning more. Markings follow how wide the road is — a single tile has a dashed centre line,
   a wider one gets edge lines and an amber centre — cars keep to the right-hand lane, and people
-  cross at the zebra crossings instead of walking into the traffic.
+  cross at the zebra crossings instead of walking into the traffic. Bends are drawn as curves,
+  and crossroads get traffic lights: east-west, then north-south, then everyone stops so people
+  can cross. Cars hold at the stop line, and mid-block zebras have no lights, so cars give way.
 - **City management**: power supply and demand, staffing, adjacency bonuses (shops next to
   homes, parks around homes, factories near power), pollution and happiness. Problems are
   flagged in the HUD and tapping one focuses the camera on it.

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { BuildingType } from '../building/types';
 import type { EraId } from '../progression/era';
 import { box, cylinder, dome, merge, part, pyramid, PALETTE, type ColorKey } from './modelParts';
-import { unpackRoadVariant } from '../world/roads';
+import { unpackRoadVariant, type RoadCorner } from '../world/roads';
 import { buildFromSpec, type ModelSpec } from './modelSpec';
 import { BUILDING_SPECS, MODERN_SPECS } from './buildingSpecs';
 
@@ -55,6 +55,11 @@ function roadParts(variant: number): THREE.BufferGeometry[] {
         z: side.z * 0.44,
       }),
     );
+  }
+
+  if (lane.corner) {
+    parts.push(...cornerParts(lane.corner));
+    return parts;
   }
 
   if (lane.axis === 'junction') {
@@ -710,6 +715,42 @@ function observationDeck(): THREE.BufferGeometry[] {
     part(cylinder(0.26, 0.26, 0.02, 14), 'iron', { y: 0.08 + column + 0.19 }),
     part(cylinder(0.02, 0.02, 0.14, 6), 'iron', { y: 0.08 + column + 0.27 }),
   ];
+}
+
+/** Where a corner's curve is centred, and which side the pavement rounds off. */
+const CORNER_ARCS: Record<RoadCorner, { cx: number; cz: number; from: number; to: number; kerbX: number; kerbZ: number }> = {
+  northEast: { cx: 0.5, cz: -0.5, from: Math.PI, to: Math.PI / 2, kerbX: -0.31, kerbZ: 0.31 },
+  eastSouth: { cx: 0.5, cz: 0.5, from: -Math.PI / 2, to: -Math.PI, kerbX: -0.31, kerbZ: -0.31 },
+  southWest: { cx: -0.5, cz: 0.5, from: 0, to: -Math.PI / 2, kerbX: 0.31, kerbZ: -0.31 },
+  westNorth: { cx: -0.5, cz: -0.5, from: Math.PI / 2, to: 0, kerbX: 0.31, kerbZ: 0.31 },
+};
+
+/**
+ * A turning road: the centre line follows the curve rather than running straight through, and
+ * the pavement on the outside is rounded off so the bend reads as a bend.
+ */
+function cornerParts(corner: RoadCorner): THREE.BufferGeometry[] {
+  const arc = CORNER_ARCS[corner];
+  const parts: THREE.BufferGeometry[] = [
+    part(cylinder(0.19, 0.19, 0.07, 10), 'sidewalk', { x: arc.kerbX, y: 0.035, z: arc.kerbZ }),
+  ];
+
+  const radius = 0.5;
+  for (const along of [0.16, 0.5, 0.84]) {
+    const angle = arc.from + (arc.to - arc.from) * along;
+    // The dash lies along the tangent of the curve at this point.
+    const way = Math.sign(arc.to - arc.from);
+    const tangentX = -Math.sin(angle) * way;
+    const tangentZ = Math.cos(angle) * way;
+    parts.push(
+      part(box(0.2, 0.012, 0.05).rotateY(Math.atan2(-tangentZ, tangentX)), 'roadLine', {
+        x: arc.cx + Math.cos(angle) * radius,
+        y: 0.056,
+        z: arc.cz + Math.sin(angle) * radius,
+      }),
+    );
+  }
+  return parts;
 }
 
 // --- Moving parts and effects ------------------------------------------------------------

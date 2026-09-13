@@ -1557,12 +1557,22 @@ export const PATHS = {
   maxTilesSearched: 1200,
 } as const;
 
+/** Traffic lights at junctions (see world/signals.ts). */
+export const SIGNALS = {
+  /** Seconds of green for each direction. */
+  carPhaseSeconds: 9,
+  /** Seconds when everything stops and people cross. */
+  walkPhaseSeconds: 6,
+  /** Junctions are shifted by a multiple of this, so the city does not blink in unison. */
+  offsetSeconds: 5,
+} as const;
+
 /** Roads: how wide they can read as, and how often people can cross them. */
 export const ROADS = {
   /** Tiles of width the markings distinguish (3 means "three or more"). */
   maxWidth: 3,
   /** A crossing every this many tiles along a road, plus every junction. */
-  crossingSpacing: 3,
+  crossingSpacing: 4,
   /** How far along a road to look when working out which way it runs. */
   maxRun: 6,
 } as const;

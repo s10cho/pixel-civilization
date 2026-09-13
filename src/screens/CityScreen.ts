@@ -34,6 +34,7 @@ import type { TileCoord } from '../render3d/coords';
 import { ConstructionView } from '../render3d/ConstructionView';
 import { DecorView } from '../render3d/DecorView';
 import { NightLightsView } from '../render3d/NightLightsView';
+import { TrafficLightsView } from '../render3d/TrafficLightsView';
 import { TrafficView } from '../render3d/TrafficView';
 import { GroundView } from '../render3d/GroundView';
 import { FrameRateMonitor, lowerQuality, resolveQualityLevel } from '../render3d/quality';
@@ -151,6 +152,7 @@ export class CityScreen implements Screen {
   private construction!: ConstructionView;
   private lights!: NightLightsView;
   private traffic!: TrafficView;
+  private signals!: TrafficLightsView;
   private citizens!: CitizenView;
   private markers!: TileMarkers;
   private picker!: TilePicker;
@@ -240,6 +242,7 @@ export class CityScreen implements Screen {
     this.construction = new ConstructionView(this.stage.scene);
     this.lights = new NightLightsView(this.stage.scene);
     this.traffic = new TrafficView(this.stage.scene, quality.vehicles);
+    this.signals = new TrafficLightsView(this.stage.scene);
     this.citizens = new CitizenView(this.stage.scene, quality.renderedCitizens);
     this.markers = new TileMarkers(this.stage.scene);
     this.applyEnvironment(this.state.era);
@@ -318,6 +321,7 @@ export class CityScreen implements Screen {
     this.construction.dispose();
     this.lights.dispose();
     this.traffic.dispose();
+    this.signals.dispose();
     this.citizens.dispose();
     this.ui.destroy();
     // Removing the canvas also drops its pointer listeners.
@@ -361,7 +365,8 @@ export class CityScreen implements Screen {
     // The hour of the day: the sky dims and the city lights up.
     this.stage.applyTimeOfDay(this.state.timeOfDay);
     this.lights.setDarkness(Stage.darknessAt(this.state.timeOfDay));
-    this.traffic.animate(frameSeconds);
+    this.traffic.animate(frameSeconds, this.state.timeOfDay, this.state.citizens);
+    this.signals.animate(this.state.timeOfDay);
     this.updateTransition(seconds);
     this.citizens.render(this.accumulator / SIMULATION.tickSeconds, seconds);
     this.buildings.animate(seconds);
@@ -956,6 +961,7 @@ export class CityScreen implements Screen {
     this.smoke.sync(this.state.buildings, this.eraOf);
     this.lights.sync(this.state.buildings);
     this.traffic.sync(this.state.buildings);
+    this.signals.sync(this.state.buildings);
   }
 
   private showTownHall(): void {

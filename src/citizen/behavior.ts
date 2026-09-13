@@ -3,7 +3,8 @@ import { BUILDINGS, CITIZENS, HAPPINESS } from '../config/balance';
 import { getSpeedMultiplier } from '../economy/happiness';
 import type { GameState } from '../simulation/gameState';
 import { nextRandom, randomRange } from '../simulation/random';
-import { findWalkPath } from './path';
+import { findWalkPath, isJunction } from './path';
+import { peopleMayCross, signalAt } from '../world/signals';
 import type { Citizen } from './types';
 
 /** Whether the citizen is outside (visible) rather than inside a home or workplace. */
@@ -136,6 +137,11 @@ function walkRoute(
     const arrived = walkTowards(citizen, exactX, exactY, dt);
     if (arrived) clearRoute(citizen);
     return arrived;
+  }
+
+  // At a junction, wait on the kerb until the lights stop the traffic.
+  if (isJunction(state, next.col, next.row) && !peopleMayCross(signalAt(state.timeOfDay, next.col, next.row))) {
+    return false;
   }
 
   // The last tile is the destination itself, where the exact spot matters.

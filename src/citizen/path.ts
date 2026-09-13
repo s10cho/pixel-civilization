@@ -2,7 +2,7 @@ import { PATHS } from '../config/balance';
 import { WORLD } from '../config/gameConfig';
 import type { GameState } from '../simulation/gameState';
 import { getBuildingAt } from '../world/placement';
-import { crossingWith, isCrossing } from '../world/roads';
+import { crossingWith, isCrossing, roadLane } from '../world/roads';
 import { isMountain } from '../world/terrain';
 import { isUnlocked } from '../world/territory';
 
@@ -26,6 +26,13 @@ export function isWalkable(state: GameState, col: number, row: number): boolean 
   if (!building) return true;
   if (building.type === 'road') return isCrossing(state, col, row);
   return building.type !== 'railway';
+}
+
+/** Whether this tile is a junction, where crossing waits for the lights. */
+export function isJunction(state: GameState, col: number, row: number): boolean {
+  const building = getBuildingAt(state, col, row);
+  if (building?.type !== 'road') return false;
+  return roadLane(state, col, row).axis === 'junction';
 }
 
 /**

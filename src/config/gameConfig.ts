@@ -199,6 +199,15 @@ export const DAY_NIGHT = {
   lampOpacity: 0.9,
 } as const;
 
+/** How the traffic lights look (their timing lives in config/balance SIGNALS). */
+export const SIGNAL_LIGHTS = {
+  poleHeight: 0.36,
+  /** How far from the tile centre the poles stand. */
+  cornerOffset: 0.36,
+  green: 0x4ad66d,
+  red: 0xe5484d,
+} as const;
+
 /** Cars and trains that keep the streets moving (see render3d/TrafficView.ts). */
 export const TRAFFIC = {
   maxVehicles: 40,
@@ -209,6 +218,8 @@ export const TRAFFIC = {
   carSpeed: [0.5, 0.9] as const,
   /** How far to the right of the centre line vehicles drive, in tiles. */
   laneOffset: 0.22,
+  /** Where a waiting vehicle holds, as progress across its tile. */
+  stopLine: 0.97,
   trainSpeed: 1.4,
   carColors: [0xf2f2f2, 0x4a6fa5, 0xc8553d, 0x3f7f5a, 0x6a6a72, 0xe0b23a] as const,
   trainColor: 0xb0472f,

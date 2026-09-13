@@ -21,6 +21,8 @@ export interface RoadLane {
   index: number;
   /** Whether people may cross the road here. */
   crossing: boolean;
+  /** Set when the road turns on this tile, naming the two sides it joins. */
+  corner?: RoadCorner;
 }
 
 /** Answers whether a tile holds a road; callers with an index of the city can pass their own. */
@@ -42,10 +44,14 @@ function connectionsWith(isRoad: IsRoadAt, col: number, row: number): number {
   return mask;
 }
 
+/** Which way a corner turns, named by the two sides it joins. */
+export type RoadCorner = 'northEast' | 'eastSouth' | 'southWest' | 'westNorth';
+
 /**
- * Reads a road tile: which way the traffic runs, how wide the road is here, this tile's place
- * across that width, and whether it carries a crossing. The direction comes from how far the
- * road reaches each way, so a two-tile-wide avenue is an avenue rather than a junction.
+ * Reads a road tile: whether it is a corner or a junction, which way the traffic runs, how
+ * wide the road is here, this tile's place across that width, and whether it carries a
+ * crossing. A corner is a single tile joining two sides, so it curves; a tile whose
+ * neighbours carry the road onwards is part of a wider road.
  */
 export function roadLane(state: GameState, col: number, row: number): RoadLane {
   return roadLaneWith(isRoadIn(state), col, row);
@@ -54,28 +60,54 @@ export function roadLane(state: GameState, col: number, row: number): RoadLane {
 /** The same reading, for callers that already know where the roads are. */
 export function roadLaneWith(isRoad: IsRoadAt, col: number, row: number): RoadLane {
   const mask = connectionsWith(isRoad, col, row);
-  const west = run(isRoad, col, row, -1, 0);
-  const east = run(isRoad, col, row, 1, 0);
-  const north = run(isRoad, col, row, 0, -1);
-  const south = run(isRoad, col, row, 0, 1);
-  const alongX = west + east + 1;
-  const alongZ = north + south + 1;
+  const northSouth = (mask & ROAD_NORTH) !== 0 || (mask & ROAD_SOUTH) !== 0;
+  const eastWest = (mask & ROAD_EAST) !== 0 || (mask & ROAD_WEST) !== 0;
   const arms = [ROAD_NORTH, ROAD_EAST, ROAD_SOUTH, ROAD_WEST].filter((bit) => mask & bit).length;
 
-  // Where a narrow road meets another, the markings give way to a junction box.
-  if (arms >= 3 && Math.min(alongX, alongZ) <= 1) {
+  // Exactly two arms on different axes: the road turns here.
+  if (arms === 2 && northSouth && eastWest) {
+    return { mask, axis: 'x', width: 1, index: 0, crossing: false, corner: cornerOf(mask) };
+  }
+
+  const alongX = run(isRoad, col, row, -1, 0) + run(isRoad, col, row, 1, 0) + 1;
+  const alongZ = run(isRoad, col, row, 0, -1) + run(isRoad, col, row, 0, 1) + 1;
+  const axis: RoadAxis = alongX === alongZ ? (eastWest && !northSouth ? 'x' : 'z') : alongX > alongZ ? 'x' : 'z';
+
+  // A road is wide where the tiles beside it carry it in the same direction.
+  const before = parallelRun(isRoad, col, row, axis, -1);
+  const after = parallelRun(isRoad, col, row, axis, 1);
+  const width = Math.min(before + after + 1, ROADS.maxWidth);
+
+  // Arms on both axes without extra width means roads meet here.
+  if (northSouth && eastWest && width === 1) {
     return { mask, axis: 'junction', width: 1, index: 0, crossing: true };
   }
 
-  const axis: RoadAxis = alongX >= alongZ ? 'x' : 'z';
-  const width = Math.min(axis === 'x' ? alongZ : alongX, ROADS.maxWidth);
-  const index = Math.min(axis === 'x' ? north : west, ROADS.maxWidth - 1);
-  // Crossings are placed along the road, so every lane of it is crossable at the same point.
   const crossing = (axis === 'x' ? col : row) % ROADS.crossingSpacing === 0;
-  return { mask, axis, width, index, crossing };
+  return { mask, axis, width, index: Math.min(before, ROADS.maxWidth - 1), crossing };
 }
 
-/** How many road tiles run from here in one direction, up to the widest road we distinguish. */
+function cornerOf(mask: number): RoadCorner {
+  if (mask & ROAD_NORTH) return mask & ROAD_EAST ? 'northEast' : 'westNorth';
+  return mask & ROAD_EAST ? 'eastSouth' : 'southWest';
+}
+
+/** How many tiles beside this one carry the road the same way, in one direction. */
+function parallelRun(isRoad: IsRoadAt, col: number, row: number, axis: RoadAxis, step: number): number {
+  let steps = 0;
+  while (steps < ROADS.maxWidth) {
+    const c = axis === 'x' ? col : col + step * (steps + 1);
+    const r = axis === 'x' ? row + step * (steps + 1) : row;
+    if (!isRoad(c, r)) break;
+    // It only counts as the same road if it runs the same way.
+    const along = axis === 'x' ? isRoad(c - 1, r) || isRoad(c + 1, r) : isRoad(c, r - 1) || isRoad(c, r + 1);
+    if (!along) break;
+    steps++;
+  }
+  return steps;
+}
+
+/** How many road tiles run from here in one direction, up to the longest road we look along. */
 function run(isRoad: IsRoadAt, col: number, row: number, dCol: number, dRow: number): number {
   let steps = 0;
   while (steps < ROADS.maxRun && isRoad(col + dCol * (steps + 1), row + dRow * (steps + 1))) steps++;
@@ -93,14 +125,26 @@ export function crossingWith(isRoad: IsRoadAt, col: number, row: number): boolea
 }
 
 /** Packs a lane description into the single number the model cache is keyed by. */
+const CORNERS: readonly RoadCorner[] = ['northEast', 'eastSouth', 'southWest', 'westNorth'];
+
 export function packRoadVariant(lane: RoadLane): number {
   const axis = lane.axis === 'junction' ? 2 : lane.axis === 'z' ? 1 : 0;
-  return lane.mask | (axis << 4) | (lane.width << 6) | (lane.index << 8) | ((lane.crossing ? 1 : 0) << 10);
+  const corner = lane.corner ? CORNERS.indexOf(lane.corner) + 1 : 0;
+  return (
+    lane.mask |
+    (axis << 4) |
+    (lane.width << 6) |
+    (lane.index << 8) |
+    ((lane.crossing ? 1 : 0) << 10) |
+    (corner << 11)
+  );
 }
 
 export function unpackRoadVariant(variant: number): RoadLane {
   const axisBits = (variant >> 4) & 0b11;
+  const corner = (variant >> 11) & 0b111;
   return {
+    corner: corner > 0 ? CORNERS[corner - 1] : undefined,
     mask: variant & 0b1111,
     axis: axisBits === 2 ? 'junction' : axisBits === 1 ? 'z' : 'x',
     width: (variant >> 6) & 0b11,
