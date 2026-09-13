@@ -81,6 +81,7 @@ import { loadPreferences, savePreferences, type Preferences } from '../storage/p
 import { Tutorial, TUTORIAL_STEPS, type TutorialEvent } from '../tutorial/tutorial';
 import { getBuildingAt } from '../world/placement';
 import { packRoadVariant, roadLane } from '../world/roads';
+import { packRailVariant, railLane } from '../world/rails';
 import { isMountain } from '../world/terrain';
 import {
   canExpand,
@@ -179,8 +180,11 @@ export class CityScreen implements Screen {
     this.eraOverrides.get(building.id) ??
     (building.heritage ? (building.builtEra ?? this.state.era) : this.state.era);
   /** Roads take their shape and lanes from the roads around them. */
-  private readonly variantOf = (building: Building): number =>
-    building.type === 'road' ? packRoadVariant(roadLane(this.state, building.col, building.row)) : 0;
+  private readonly variantOf = (building: Building): number => {
+    if (building.type === 'road') return packRoadVariant(roadLane(this.state, building.col, building.row));
+    if (building.type === 'railway') return packRailVariant(railLane(this.state, building.col, building.row));
+    return 0;
+  };
 
   private activeTool: BuildingType | null = null;
   private movingBuildingId: number | null = null;

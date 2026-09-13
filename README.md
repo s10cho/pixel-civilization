@@ -48,8 +48,8 @@ Nothing in the game can be lost or destroyed: shortages only slow the city down 
 - **A city with a history**: rocky ridges to grow around, an old quarter that keeps its
   original era while the rest modernises, and a City history card comparing the beginning with
   now.
-- **Something always moving**: day turns to night and the windows light up, cars run the roads
-  and a train runs the rails.
+- **Something always moving**: day turns to night and the windows light up, cars run the roads,
+  and a locomotive pulls its carriages along rails that bend round curves and stop at buffers.
 - **Achievements**: nineteen gentle milestones with progress bars and small gold rewards.
 - **Small gifts**: a traveling merchant, a good harvest, a village festival or a wandering
   scholar drops by now and then. No event ever sets the city back.

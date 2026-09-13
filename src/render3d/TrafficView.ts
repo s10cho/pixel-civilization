@@ -6,7 +6,8 @@ import { TRAFFIC } from '../config/gameConfig';
 import { carsMayPass, crossingSignalAt, signalAt } from '../world/signals';
 import { roadLaneWith } from '../world/roads';
 import { tileToWorld } from './coords';
-import { box, merge, part } from './modelParts';
+import { TRACK } from '../config/gameConfig';
+import { box, cylinder, merge, part } from './modelParts';
 
 interface Vehicle {
   /** The tile it came from, the one it is crossing, and the one it is heading for. */
@@ -21,12 +22,105 @@ interface Vehicle {
   speed: number;
   rail: boolean;
   colour: THREE.Color;
+  /** Where a train has been, so its carriages can follow the same rails. */
+  trail?: TrailPoint[];
+  /** How far the train has run in all, in tiles. */
+  travelled: number;
+}
+
+/** One remembered point of a train's path. */
+interface TrailPoint {
+  x: number;
+  z: number;
+  angle: number;
+  travelled: number;
 }
 
 /** What a tile asks of the traffic on it. */
 type Control = 'junction' | 'crossing';
 
 const key = (col: number, row: number): number => col * 1000 + row;
+
+
+/** Height of the rail head, so the wheels sit on the track rather than in it. */
+const RAIL_TOP = TRACK.bedHeight + TRACK.sleeperHeight + TRACK.railHeight;
+
+/** The bogies and buffers every vehicle on the line shares. */
+function runningGear(length: number): THREE.BufferGeometry[] {
+  return [
+    part(box(0.24, 0.035, length), 'iron', { y: RAIL_TOP + 0.018 }),
+    // Wheels: a pair under each end, just inside the rails.
+    ...[-length / 2 + 0.1, length / 2 - 0.1].flatMap((z) =>
+      [-TRACK.gauge / 2, TRACK.gauge / 2].map((x) =>
+        part(cylinder(0.035, 0.035, 0.02, 8).rotateZ(Math.PI / 2), 'roofDark', { x, y: RAIL_TOP - 0.01, z }),
+      ),
+    ),
+  ];
+}
+
+/**
+ * The locomotive, built along +Z because that is the way a vehicle faces: a boiler up front
+ * with its chimney and dome, the cab behind it, and a buffer beam at the nose.
+ */
+function locomotiveParts(): THREE.BufferGeometry[] {
+  const length = 0.5;
+  const floor = RAIL_TOP + 0.035;
+  return [
+    ...runningGear(length),
+    // Boiler: a barrel lying along the track, with a smokebox band at the front.
+    part(cylinder(0.08, 0.08, 0.28, 10).rotateX(Math.PI / 2), 'trainBody', { y: floor + 0.08, z: 0.08 }),
+    part(cylinder(0.085, 0.085, 0.035, 10).rotateX(Math.PI / 2), 'roofDark', { y: floor + 0.08, z: 0.22 }),
+    part(box(0.17, 0.02, 0.26), 'trainTrim', { y: floor + 0.082, z: 0.08 }),
+    // Cab: a green lower half, a window either side, and a dark roof capping it.
+    part(box(0.19, 0.09, 0.18), 'trainBody', { y: floor + 0.045, z: -0.16 }),
+    part(box(0.195, 0.055, 0.18), 'trainBody', { y: floor + 0.118, z: -0.16 }),
+    part(box(0.2, 0.045, 0.1), 'glass', { y: floor + 0.118, z: -0.16 }),
+    part(box(0.2, 0.028, 0.2), 'roofDark', { y: floor + 0.16, z: -0.16 }),
+    // Chimney over the smokebox, steam dome over the boiler.
+    part(cylinder(0.026, 0.034, 0.075, 8), 'roofDark', { y: floor + 0.195, z: 0.18 }),
+    part(cylinder(0.032, 0.032, 0.035, 8), 'trainTrim', { y: floor + 0.175, z: 0.04 }),
+    // Buffer beam and lamp at the nose.
+    part(box(0.23, 0.05, 0.03), 'clothRed', { y: RAIL_TOP + 0.05, z: length / 2 }),
+    part(box(0.04, 0.04, 0.03), 'gold', { y: RAIL_TOP + 0.1, z: length / 2 }),
+  ];
+}
+
+/** A passenger carriage: a body on the same running gear, with a band of windows. */
+function carriageParts(): THREE.BufferGeometry[] {
+  const length = 0.34;
+  const floor = RAIL_TOP + 0.035;
+  return [
+    ...runningGear(length),
+    part(box(0.19, 0.085, length), 'trainBody', { y: floor + 0.043 }),
+    // A cream band with the windows set into it, so a carriage reads as one at a glance.
+    part(box(0.195, 0.055, length), 'trainTrim', { y: floor + 0.115 }),
+    part(box(0.2, 0.036, length - 0.09), 'glass', { y: floor + 0.115 }),
+    part(box(0.2, 0.028, length), 'roofDark', { y: floor + 0.157 }),
+  ];
+}
+
+/** The point on a train's trail a given distance behind its head, or null if it is not there yet. */
+function sampleTrail(trail: TrailPoint[], travelled: number): TrailPoint | null {
+  if (trail.length < 2 || trail[0].travelled > travelled) return null;
+  for (let i = trail.length - 1; i > 0; i--) {
+    const ahead = trail[i];
+    const behind = trail[i - 1];
+    if (behind.travelled > travelled) continue;
+    const span = ahead.travelled - behind.travelled;
+    const along = span > 1e-6 ? (travelled - behind.travelled) / span : 0;
+    // Angles wrap, so turn towards the next one the short way round.
+    let turn = ahead.angle - behind.angle;
+    while (turn > Math.PI) turn -= Math.PI * 2;
+    while (turn < -Math.PI) turn += Math.PI * 2;
+    return {
+      x: behind.x + (ahead.x - behind.x) * along,
+      z: behind.z + (ahead.z - behind.z) * along,
+      angle: behind.angle + turn * along,
+      travelled,
+    };
+  }
+  return null;
+}
 
 /**
  * Cars on the roads and a train on the rails. Vehicles curve through their tile rather than
@@ -37,6 +131,7 @@ export class TrafficView {
   private readonly material = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 });
   private readonly cars: THREE.InstancedMesh;
   private readonly trains: THREE.InstancedMesh;
+  private readonly carriages: THREE.InstancedMesh;
   private vehicles: Vehicle[] = [];
   /** Road and rail tiles: true for rail. */
   private network = new Map<number, boolean>();
@@ -63,13 +158,8 @@ export class TrafficView {
         part(box(0.17, 0.03, 0.06), 'iron', { y: 0.03, z: 0.1 }),
       ]),
     );
-    this.trains = this.createMesh(
-      merge([
-        part(box(0.2, 0.12, 0.62), 'clothRed', { y: 0.11 }),
-        part(box(0.22, 0.04, 0.64), 'iron', { y: 0.05 }),
-        part(box(0.16, 0.07, 0.14), 'glass', { y: 0.19, z: -0.2 }),
-      ]),
-    );
+    this.trains = this.createMesh(merge(locomotiveParts()));
+    this.carriages = this.createMesh(merge(carriageParts()));
   }
 
   /** Rebuilds the network, the places traffic must watch, and the number of vehicles. */
@@ -113,6 +203,7 @@ export class TrafficView {
 
     let cars = 0;
     let trains = 0;
+    let carriages = 0;
     for (const vehicle of this.vehicles) {
       vehicle.t += step * vehicle.speed;
       if (vehicle.t >= 1) {
@@ -158,13 +249,53 @@ export class TrafficView {
       }
       this.matrix.compose(this.position, this.rotation, this.scale);
 
-      const mesh = vehicle.rail ? this.trains : this.cars;
-      const index = vehicle.rail ? trains++ : cars++;
-      mesh.setMatrixAt(index, this.matrix);
-      mesh.setColorAt(index, vehicle.colour);
+      if (!vehicle.rail) {
+        const index = cars++;
+        this.cars.setMatrixAt(index, this.matrix);
+        this.cars.setColorAt(index, vehicle.colour);
+        continue;
+      }
+
+      const index = trains++;
+      this.trains.setMatrixAt(index, this.matrix);
+      this.trains.setColorAt(index, vehicle.colour);
+      carriages = this.drawCarriages(vehicle, carriages);
     }
     this.commit(this.cars, cars);
     this.commit(this.trains, trains);
+    this.commit(this.carriages, carriages);
+  }
+
+  /**
+   * Remembers where the locomotive has been and puts the carriages on that same line, so a
+   * train bends round a curve instead of sliding through it sideways.
+   */
+  private drawCarriages(vehicle: Vehicle, from: number): number {
+    const angle = Math.atan2(this.tangent.x, this.tangent.z);
+    const trail = (vehicle.trail ??= []);
+    const last = trail[trail.length - 1];
+    const moved = last ? Math.hypot(this.position.x - last.x, this.position.z - last.z) : 0;
+    if (!last || moved > 1e-4) {
+      vehicle.travelled += moved;
+      trail.push({ x: this.position.x, z: this.position.z, angle, travelled: vehicle.travelled });
+    }
+    // Only the stretch the carriages still stand on is worth keeping.
+    const keep = TRAFFIC.couplingToFirst + TRAFFIC.carriageSpacing * TRAFFIC.trainCarriages;
+    while (trail.length > 2 && trail[1].travelled < vehicle.travelled - keep) trail.shift();
+
+    let count = from;
+    for (let i = 1; i <= TRAFFIC.trainCarriages; i++) {
+      const back = TRAFFIC.couplingToFirst + (i - 1) * TRAFFIC.carriageSpacing;
+      const point = sampleTrail(trail, vehicle.travelled - back);
+      if (!point) break;
+      this.position.set(point.x, this.position.y, point.z);
+      this.rotation.setFromAxisAngle(this.up, point.angle);
+      this.matrix.compose(this.position, this.rotation, this.scale);
+      this.carriages.setMatrixAt(count, this.matrix);
+      this.carriages.setColorAt(count, vehicle.colour);
+      count++;
+    }
+    return count;
   }
 
   /** Vehicles drawn at most; lower quality settings keep the streets quieter. */
@@ -174,7 +305,7 @@ export class TrafficView {
   }
 
   dispose(): void {
-    for (const mesh of [this.cars, this.trains]) {
+    for (const mesh of [this.cars, this.trains, this.carriages]) {
       this.scene.remove(mesh);
       mesh.geometry.dispose();
       mesh.dispose();
@@ -229,8 +360,10 @@ export class TrafficView {
           ? TRAFFIC.trainSpeed
           : TRAFFIC.carSpeed[0] + Math.random() * (TRAFFIC.carSpeed[1] - TRAFFIC.carSpeed[0]),
         rail,
+        travelled: 0,
+        // Cars are painted per instance; the train carries its livery in its own geometry.
         colour: new THREE.Color(
-          rail ? TRAFFIC.trainColor : TRAFFIC.carColors[Math.floor(Math.random() * TRAFFIC.carColors.length)],
+          rail ? 0xffffff : TRAFFIC.carColors[Math.floor(Math.random() * TRAFFIC.carColors.length)],
         ),
       };
       const next = this.pickNext(vehicle);

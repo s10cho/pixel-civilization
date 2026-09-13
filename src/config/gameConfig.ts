@@ -210,6 +210,19 @@ export const SIGNAL_LIGHTS = {
   red: 0xe5484d,
 } as const;
 
+/** How a railway tile is drawn: ballast, sleepers across the track, rails along it. */
+export const TRACK = {
+  bedWidth: 0.46,
+  bedHeight: 0.035,
+  sleeperLength: 0.4,
+  sleeperWidth: 0.07,
+  sleeperHeight: 0.022,
+  /** Distance between the two rails. */
+  gauge: 0.22,
+  railWidth: 0.035,
+  railHeight: 0.028,
+} as const;
+
 /** Cars and trains that keep the streets moving (see render3d/TrafficView.ts). */
 export const TRAFFIC = {
   maxVehicles: 40,
@@ -223,8 +236,12 @@ export const TRAFFIC = {
   /** Where a waiting vehicle holds, as progress across its tile. */
   stopLine: 0.97,
   trainSpeed: 1.4,
+  /** Carriages pulled behind the locomotive, and the gaps between them, in tiles. */
+  trainCarriages: 3,
+  /** Locomotive centre to the first carriage's centre, then carriage centre to centre. */
+  couplingToFirst: 0.5,
+  carriageSpacing: 0.42,
   carColors: [0xf2f2f2, 0x4a6fa5, 0xc8553d, 0x3f7f5a, 0x6a6a72, 0xe0b23a] as const,
-  trainColor: 0xb0472f,
 } as const;
 
 /** Chimney smoke: puffs rise, drift with the wind, swell and fade. */

@@ -3,6 +3,8 @@ import type { BuildingType } from '../building/types';
 import type { EraId } from '../progression/era';
 import { box, cylinder, dome, merge, part, pyramid, PALETTE, type ColorKey } from './modelParts';
 import { unpackRoadVariant, type RoadCorner } from '../world/roads';
+import { unpackRailVariant } from '../world/rails';
+import { TRACK } from '../config/gameConfig';
 import { buildFromSpec, type ModelSpec } from './modelSpec';
 import { BUILDING_SPECS, MODERN_SPECS } from './buildingSpecs';
 
@@ -12,7 +14,7 @@ const buildingCache = new Map<string, THREE.BufferGeometry>();
 
 /**
  * Shared geometry for a building type at a level in an era. `variant` covers buildings whose
- * shape depends on their surroundings — roads connect to their neighbours.
+ * shape depends on their surroundings — roads and railways connect to their neighbours.
  */
 export function getBuildingGeometry(
   type: BuildingType,
@@ -23,7 +25,9 @@ export function getBuildingGeometry(
   const key = `${type}:${level}:${era}:${variant}`;
   let geometry = buildingCache.get(key);
   if (!geometry) {
-    geometry = merge(type === 'road' ? roadParts(variant) : buildingParts(type, level, era));
+    const parts =
+      type === 'road' ? roadParts(variant) : type === 'railway' ? railParts(variant) : buildingParts(type, level, era);
+    geometry = merge(parts);
     buildingCache.set(key, geometry);
   }
   return geometry;
@@ -104,6 +108,112 @@ function roadParts(variant: number): THREE.BufferGeometry[] {
   // The middle of the road: painted by the tile just inside it, so it is drawn once.
   if (lane.index === Math.floor((lane.width - 1) / 2) && lane.index < lane.width - 1) {
     mark('roadCentre', 0.98, 0.07, 0, 0.48);
+  }
+  return parts;
+}
+
+
+/**
+ * A tile of railway: a ballast bed carrying sleepers laid across the track and two rails
+ * running along it. Bends curve, crossings lay both directions, and the end of a line gets
+ * a buffer stop.
+ */
+function railParts(variant: number): THREE.BufferGeometry[] {
+  const lane = unpackRailVariant(variant);
+  const parts: THREE.BufferGeometry[] = [];
+
+  /** Lays the bed, sleepers and rails for one straight run along `axis`. */
+  const straight = (axis: 'x' | 'z', half: boolean, towards = 0): void => {
+    const alongX = axis === 'x';
+    const length = half ? 0.5 : 0.98;
+    const shift = half ? (towards * (0.98 - length)) / 2 + (towards * length) / 2 - towards * 0.005 : 0;
+    const bed = (along: number, across: number, y: number, colour: ColorKey, height: number, offset = 0): void => {
+      parts.push(
+        part(box(alongX ? along : across, height, alongX ? across : along), colour, {
+          x: alongX ? shift + offset : offset,
+          y,
+          z: alongX ? offset : shift + offset,
+        }),
+      );
+    };
+    bed(length, TRACK.bedWidth, TRACK.bedHeight / 2, 'ballast', TRACK.bedHeight);
+    // Sleepers sit across the track, evenly spaced along it.
+    const count = half ? 3 : 5;
+    for (let i = 0; i < count; i++) {
+      const along = ((i + 0.5) / count - 0.5) * length;
+      parts.push(
+        part(box(alongX ? TRACK.sleeperWidth : TRACK.sleeperLength, TRACK.sleeperHeight, alongX ? TRACK.sleeperLength : TRACK.sleeperWidth), 'woodDark', {
+          x: alongX ? shift + along : 0,
+          y: TRACK.bedHeight + TRACK.sleeperHeight / 2,
+          z: alongX ? 0 : shift + along,
+        }),
+      );
+    }
+    // Two rails on top, one either side of the centre line.
+    for (const side of [-TRACK.gauge / 2, TRACK.gauge / 2]) {
+      bed(length, TRACK.railWidth, TRACK.bedHeight + TRACK.sleeperHeight + TRACK.railHeight / 2, 'railSteel', TRACK.railHeight, side);
+    }
+  };
+
+  if (lane.corner) {
+    parts.push(...railCornerParts(lane.corner));
+    return parts;
+  }
+
+  if (lane.axis === 'crossing') {
+    straight('x', false);
+    straight('z', false);
+    return parts;
+  }
+
+  straight(lane.axis, false);
+  if (lane.buffer) {
+    // A buffer stop closes the open end: the side the track does not carry on to.
+    const alongX = lane.axis === 'x';
+    const open = lane.mask & (alongX ? 2 : 1) ? -1 : 1;
+    const y = TRACK.bedHeight + TRACK.sleeperHeight;
+    parts.push(
+      part(box(alongX ? 0.05 : 0.3, 0.1, alongX ? 0.3 : 0.05), 'woodDark', {
+        x: alongX ? open * 0.44 : 0,
+        y: y + 0.05,
+        z: alongX ? 0 : open * 0.44,
+      }),
+    );
+  }
+  return parts;
+}
+
+/** A bend: the bed, sleepers and rails all follow the quarter circle through the tile. */
+function railCornerParts(corner: RoadCorner): THREE.BufferGeometry[] {
+  const arc = CORNER_ARCS[corner];
+  const parts: THREE.BufferGeometry[] = [];
+  const radius = 0.5;
+  const steps = 6;
+  for (let i = 0; i < steps; i++) {
+    const angle = arc.from + (arc.to - arc.from) * ((i + 0.5) / steps);
+    const way = Math.sign(arc.to - arc.from);
+    const tangent = Math.atan2(-(Math.cos(angle) * way), -Math.sin(angle) * way);
+    const at = (distance: number, height: number, y: number) => ({
+      x: arc.cx + Math.cos(angle) * (radius + distance),
+      y,
+      z: arc.cz + Math.sin(angle) * (radius + distance),
+      rot: tangent,
+      height,
+    });
+    const bedSpot = at(0, TRACK.bedHeight, TRACK.bedHeight / 2);
+    parts.push(
+      part(box(0.98 / steps + 0.03, TRACK.bedHeight, TRACK.bedWidth).rotateY(bedSpot.rot), 'ballast', bedSpot),
+    );
+    const sleeper = at(0, TRACK.sleeperHeight, TRACK.bedHeight + TRACK.sleeperHeight / 2);
+    parts.push(
+      part(box(TRACK.sleeperWidth, TRACK.sleeperHeight, TRACK.sleeperLength).rotateY(sleeper.rot), 'woodDark', sleeper),
+    );
+    for (const side of [-TRACK.gauge / 2, TRACK.gauge / 2]) {
+      const rail = at(side, TRACK.railHeight, TRACK.bedHeight + TRACK.sleeperHeight + TRACK.railHeight / 2);
+      parts.push(
+        part(box(0.98 / steps + 0.04, TRACK.railHeight, TRACK.railWidth).rotateY(rail.rot), 'railSteel', rail),
+      );
+    }
   }
   return parts;
 }

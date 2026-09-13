@@ -58,6 +58,10 @@ export const PALETTE = {
   roadLine: 0xe6e2d4,
   roadCentre: 0xe8c34a,
   sidewalk: 0xb9b5ac,
+  ballast: 0x8e8577,
+  railSteel: 0x8a8f97,
+  trainBody: 0x2f5d4e,
+  trainTrim: 0xe3d7b8,
 } as const;
 
 export type ColorKey = keyof typeof PALETTE;
