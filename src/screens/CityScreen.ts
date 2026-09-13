@@ -15,8 +15,9 @@ import {
 } from '../config/balance';
 import { AUTO_QUALITY, CAMERA, ERA_TRANSITION, QUALITY, SAVE, SIMULATION, type QualityLevel } from '../config/gameConfig';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../config/research';
-import { getAdvice } from '../consulting/advice';
+import { getAdvice, type Advice } from '../consulting/advice';
 import { applyProposal, getProposals, type Proposal } from '../consulting/proposals';
+import { consultModel, NO_OPINION, type ModelOpinion } from '../consulting/llm';
 import { computeCityReport, type CityReport } from '../economy/cityReport';
 import { t, tKey } from '../i18n';
 import { buildingName, eraName, eraTagline, researchDescription, researchName } from '../i18n/names';
@@ -72,7 +73,7 @@ import { Modal } from '../ui/Modal';
 import type { ResearchCard, ResearchPanelView } from '../ui/ResearchPanel';
 import { openAchievements } from '../ui/AchievementsDialog';
 import { openHelp } from '../ui/HelpDialog';
-import { openConsulting } from '../ui/ConsultingDialog';
+import { openConsulting, type ConsultingCard, type ConsultingView } from '../ui/ConsultingDialog';
 import { openExpand } from '../ui/ExpandDialog';
 import { openHistory } from '../ui/HistoryDialog';
 import { openSettings } from '../ui/SettingsDialog';
@@ -215,7 +216,7 @@ export class CityScreen implements Screen {
   private helpModal: Modal | null = null;
   private achievementsModal: Modal | null = null;
   private historyModal: Modal | null = null;
-  private consultingModal: Modal | null = null;
+  private consultingCard: ConsultingCard | null = null;
   private expandModal: Modal | null = null;
   /** Seconds since the advisor's last action. */
   private autoGrowSeconds = 0;
@@ -310,7 +311,7 @@ export class CityScreen implements Screen {
     this.helpModal?.close();
     this.achievementsModal?.close();
     this.historyModal?.close();
-    this.consultingModal?.close();
+    this.consultingCard?.modal.close();
     this.expandModal?.close();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     window.removeEventListener('pagehide', this.onPageHide);
@@ -767,32 +768,44 @@ export class CityScreen implements Screen {
 
   /** AI consulting: what the city looks like from outside, and a few plans to choose from. */
   private openConsultingDialog(): void {
-    if (this.consultingModal?.isOpen) return;
+    if (this.consultingCard?.modal.isOpen) return;
     audio.play('select');
-    this.consultingModal = openConsulting(
-      this.uiRoot,
-      {
-        advice: getAdvice(this.state, this.report),
-        proposals: getProposals(this.state, this.report),
-        projects: this.projectOffers(),
-        building: this.state.projects.map((project) => ({
-          kind: project.kind,
-          progress: Math.min(1, project.progress / project.work),
-        })),
-        era: this.state.era,
-        gold: this.state.resources.gold,
-      },
-      {
-        onShow: (focus) => {
-          this.consultingModal?.close();
-    this.expandModal?.close();
-          this.rig.focusTile(focus.col, focus.row);
-          this.select(focus);
-        },
-        onApply: (proposal) => this.acceptProposal(proposal),
-        onStartProject: (kind) => this.commissionProject(kind),
-      },
+    const advice = getAdvice(this.state, this.report);
+    const proposals = getProposals(this.state, this.report);
+    // A model, where one is configured, reads the same city and says which plan it would look
+    // at first. Its answer arrives later and refreshes the card; the card works without it.
+    const model = consultModel(this.state, this.report, advice, proposals, (opinion) =>
+      this.consultingCard?.update(this.consultingViewOf(advice, proposals, opinion)),
     );
+    this.consultingCard = openConsulting(this.uiRoot, this.consultingViewOf(advice, proposals, model), {
+      onShow: (focus) => {
+        this.consultingCard?.modal.close();
+        this.expandModal?.close();
+        this.rig.focusTile(focus.col, focus.row);
+        this.select(focus);
+      },
+      onApply: (proposal) => this.acceptProposal(proposal),
+      onStartProject: (kind) => this.commissionProject(kind),
+    });
+  }
+
+  private consultingViewOf(
+    advice: readonly Advice[],
+    proposals: readonly Proposal[],
+    model: ModelOpinion = NO_OPINION,
+  ): ConsultingView {
+    return {
+      advice,
+      proposals,
+      projects: this.projectOffers(),
+      building: this.state.projects.map((project) => ({
+        kind: project.kind,
+        progress: Math.min(1, project.progress / project.work),
+      })),
+      era: this.state.era,
+      gold: this.state.resources.gold,
+      model,
+    };
   }
 
   /** Large works the city could commission right now. */
@@ -808,7 +821,7 @@ export class CityScreen implements Screen {
   }
 
   private commissionProject(kind: ProjectKind): void {
-    this.consultingModal?.close();
+    this.consultingCard?.modal.close();
     const plan = planProject(this.state, kind);
     if (!plan || !startProject(this.state, plan)) {
       this.fail(t('consult.tooExpensive'));
@@ -837,7 +850,7 @@ export class CityScreen implements Screen {
 
   /** Carries out a plan the player accepted. */
   private acceptProposal(proposal: Proposal): void {
-    this.consultingModal?.close();
+    this.consultingCard?.modal.close();
     this.expandModal?.close();
     if (this.state.resources.gold < proposal.cost) {
       this.fail(t('consult.tooExpensive'));

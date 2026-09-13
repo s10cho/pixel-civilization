@@ -79,11 +79,43 @@ npm install
 npm run dev        # dev server at http://localhost:5173
 npm test           # simulation unit tests (Vitest)
 npm run typecheck  # tsc --noEmit
-npm run build      # typecheck + production build to dist/
+npm run build      # typecheck + production build to dist/, then the bundle secret check
 npm run preview    # serve the production build
+npm run relay      # the consulting relay, for development (see below)
 ```
 
 Rendering quality can be forced with `?quality=high|medium|low`.
+
+## AI consulting
+
+The consulting card always works on its own: a local rule-based advisor reads the city, says
+what stands out and works out the plans on offer. That is the whole service in the published
+build, which makes no network calls at all.
+
+A language model can be put on top of it. It is given a short summary of the city and the plans
+the game has already worked out, and it answers with a few sentences about the city and which
+of those plans it would look at first. It cannot invent a plan, a building or a place: any id
+it returns that the game did not offer is dropped before the card sees it. The advisor helps;
+it never plays.
+
+There are two ways to reach a model, chosen by what is configured:
+
+```sh
+cp .env.example .env.local
+
+# Development, with your own key. Only `vite dev` ever sees it.
+#   VITE_ANTHROPIC_API_KEY=sk-ant-...
+
+# The shape the released game will use: a small server holds the key.
+#   VITE_CONSULTING_URL=http://localhost:8787/consulting
+npm run relay                                  # canned answers, no key, no cost
+ANTHROPIC_API_KEY=sk-ant-... npm run relay     # a real model
+CONSULTING_DELAY_MS=1500 npm run relay         # answer slowly, to see the card wait
+```
+
+`tools/consulting-relay.mjs` is that server, small enough to read in one sitting and meant to be
+deployed as-is later. Keys never belong in a build: `vite.config.ts` hands the development key
+only to `vite dev`, and `npm run build` fails if anything key-shaped reaches `dist/`.
 
 ## Structure
 

@@ -1,6 +1,7 @@
 import { t, tKey } from '../i18n';
 import { buildingName } from '../i18n/names';
 import type { Advice } from '../consulting/advice';
+import type { ModelOpinion } from '../consulting/llm';
 import type { Proposal } from '../consulting/proposals';
 import type { ProjectKind } from '../config/balance';
 import type { EraId } from '../progression/era';
@@ -31,6 +32,8 @@ export interface ConsultingView {
   building: readonly ProjectProgress[];
   era: EraId;
   gold: number;
+  /** What a model made of the city, when one is configured. */
+  model: ModelOpinion;
 }
 
 export interface ConsultingHandlers {
@@ -39,13 +42,43 @@ export interface ConsultingHandlers {
   onStartProject(kind: ProjectKind): void;
 }
 
+/** An open consulting card, which can be refreshed in place when the model answers. */
+export interface ConsultingCard {
+  modal: Modal;
+  update(view: ConsultingView): void;
+}
+
 /**
  * The AI consulting card: what the city looks like from outside, and a few plans the player
  * can accept with one tap. Nothing here happens without being chosen.
  */
-export function openConsulting(root: HTMLElement, view: ConsultingView, handlers: ConsultingHandlers): Modal {
+export function openConsulting(
+  root: HTMLElement,
+  view: ConsultingView,
+  handlers: ConsultingHandlers,
+): ConsultingCard {
   const body = el('div', 'consulting');
+  fill(body, view, handlers);
+  const modal = new Modal(root, {
+    title: t('consult.title'),
+    icon: 'lightbulb',
+    body,
+    actions: [{ label: t('consult.close'), variant: 'primary' }],
+  });
+  return {
+    modal,
+    update(next: ConsultingView) {
+      if (!modal.isOpen) return;
+      body.replaceChildren();
+      fill(body, next, handlers);
+    },
+  };
+}
+
+function fill(body: HTMLElement, view: ConsultingView, handlers: ConsultingHandlers): void {
   body.append(el('p', 'modal-text', t('consult.intro')));
+  const opinion = modelCard(view.model);
+  if (opinion) body.append(opinion);
 
   if (view.advice.length === 0 && view.proposals.length === 0) {
     body.append(el('p', 'modal-text', t('consult.none')));
@@ -68,7 +101,7 @@ export function openConsulting(root: HTMLElement, view: ConsultingView, handlers
 
   if (view.proposals.length > 0) {
     body.append(el('h3', 'credits-heading', t('consult.proposalTitle')));
-    for (const proposal of view.proposals) {
+    for (const proposal of ordered(view)) {
       const card = el('div', 'proposal');
       const where = proposal.where ? tKey(`where.${proposal.where}`) : '';
       const title = el('div', 'proposal-title', tKey(`proposal.${proposal.kind}`, { where }));
@@ -83,6 +116,12 @@ export function openConsulting(root: HTMLElement, view: ConsultingView, handlers
           proposal.kind === 'expand' ? t('proposal.expandDetail') : summarize(proposal, view.era),
         ),
       );
+      const why = view.model.why?.get(proposal.id);
+      if (why) {
+        const note = el('div', 'proposal-why');
+        note.append(icon('lightbulb', 'advice-icon'), el('span', '', why));
+        card.append(note);
+      }
 
       const foot = el('div', 'proposal-foot');
       const affordable = view.gold >= proposal.cost;
@@ -152,13 +191,31 @@ export function openConsulting(root: HTMLElement, view: ConsultingView, handlers
   }
 
   body.append(el('p', 'modal-note', t('consult.footer')));
+}
 
-  return new Modal(root, {
-    title: t('consult.title'),
-    icon: 'lightbulb',
-    body,
-    actions: [{ label: t('consult.close'), variant: 'primary' }],
-  });
+/** The model's own reading of the city, while it is thinking and once it has answered. */
+function modelCard(model: ModelOpinion): HTMLElement | null {
+  if (model.state === 'off' || model.state === 'failed') return null;
+  const card = el('div', 'model-note');
+  card.append(el('span', 'model-badge', t('consult.modelBadge')));
+  if (model.state === 'pending') {
+    card.classList.add('is-pending');
+    card.append(el('span', 'model-text', t('consult.modelThinking')));
+    return card;
+  }
+  if (!model.note) return null;
+  card.append(el('span', 'model-text', model.note));
+  return card;
+}
+
+/** The plans, with anything the model singled out brought to the front. */
+function ordered(view: ConsultingView): readonly Proposal[] {
+  const picks = view.model.order;
+  if (!picks || picks.length === 0) return view.proposals;
+  const rank = new Map(picks.map((id, index) => [id, index]));
+  return [...view.proposals].sort(
+    (a, b) => (rank.get(a.id) ?? picks.length) - (rank.get(b.id) ?? picks.length),
+  );
 }
 
 function adviceText(advice: Advice): string {

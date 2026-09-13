@@ -51,6 +51,8 @@ export const en = {
   'consult.intro': 'A look at your city. The choice is always yours.',
   'consult.adviceTitle': 'What stands out',
   'consult.proposalTitle': 'Things you could do',
+  'consult.modelBadge': 'AI',
+  'consult.modelThinking': 'Reading the city…',
   'consult.none': 'Nothing needs you right now: the city is doing fine.',
   'consult.apply': 'Do it',
   'consult.show': 'Show me',

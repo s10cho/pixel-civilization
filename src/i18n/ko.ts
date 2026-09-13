@@ -50,6 +50,8 @@ export const ko: Record<MessageKey, string> = {
   'consult.intro': 'AI가 도시를 살펴봤습니다. 선택은 늘 당신의 몫입니다.',
   'consult.adviceTitle': '눈에 띄는 점',
   'consult.proposalTitle': '해볼 만한 일',
+  'consult.modelBadge': 'AI',
+  'consult.modelThinking': '도시를 읽는 중…',
   'consult.none': '지금은 특별히 손댈 것이 없습니다. 도시가 잘 굴러갑니다.',
   'consult.apply': '이대로 진행',
   'consult.show': '위치 보기',
