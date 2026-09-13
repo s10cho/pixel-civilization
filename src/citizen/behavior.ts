@@ -3,8 +3,8 @@ import { BUILDINGS, CITIZENS, HAPPINESS } from '../config/balance';
 import { getSpeedMultiplier } from '../economy/happiness';
 import type { GameState } from '../simulation/gameState';
 import { nextRandom, randomRange } from '../simulation/random';
-import { findWalkPath, isJunction } from './path';
-import { peopleMayCross, signalAt } from '../world/signals';
+import { findWalkPath, tileControl } from './path';
+import { peopleMayStep } from '../world/signals';
 import type { Citizen } from './types';
 
 /** Whether the citizen is outside (visible) rather than inside a home or workplace. */
@@ -139,10 +139,9 @@ function walkRoute(
     return arrived;
   }
 
-  // At a junction, wait on the kerb until the lights stop the traffic.
-  if (isJunction(state, next.col, next.row) && !peopleMayCross(signalAt(state.timeOfDay, next.col, next.row))) {
-    return false;
-  }
+  // At a junction or a signalled crossing, wait on the kerb until the lights stop the traffic.
+  const control = tileControl(state, next.col, next.row);
+  if (control && !peopleMayStep(control, state.timeOfDay, next.col, next.row)) return false;
 
   // The last tile is the destination itself, where the exact spot matters.
   const last = citizen.path.length === 1;

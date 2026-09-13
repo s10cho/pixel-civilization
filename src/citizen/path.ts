@@ -4,6 +4,7 @@ import type { GameState } from '../simulation/gameState';
 import { getBuildingAt } from '../world/placement';
 import { crossingWith, isCrossing, roadLane } from '../world/roads';
 import { isMountain } from '../world/terrain';
+import type { TileControl } from '../world/signals';
 import { isUnlocked } from '../world/territory';
 
 export interface Tile {
@@ -28,11 +29,18 @@ export function isWalkable(state: GameState, col: number, row: number): boolean 
   return building.type !== 'railway';
 }
 
+/** Whether stepping onto this tile waits for lights, and which kind. */
+export function tileControl(state: GameState, col: number, row: number): TileControl | null {
+  const building = getBuildingAt(state, col, row);
+  if (building?.type !== 'road') return null;
+  const lane = roadLane(state, col, row);
+  if (lane.axis === 'junction') return { kind: 'junction' };
+  return lane.crossing ? { kind: 'crossing', axis: lane.axis } : null;
+}
+
 /** Whether this tile is a junction, where crossing waits for the lights. */
 export function isJunction(state: GameState, col: number, row: number): boolean {
-  const building = getBuildingAt(state, col, row);
-  if (building?.type !== 'road') return false;
-  return roadLane(state, col, row).axis === 'junction';
+  return tileControl(state, col, row)?.kind === 'junction';
 }
 
 /**

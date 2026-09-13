@@ -1565,6 +1565,9 @@ export const SIGNALS = {
   walkPhaseSeconds: 6,
   /** Junctions are shifted by a multiple of this, so the city does not blink in unison. */
   offsetSeconds: 5,
+  /** A zebra crossing away from a junction has its own, simpler two-step cycle. */
+  crossingCarSeconds: 12,
+  crossingWalkSeconds: 7,
 } as const;
 
 /** Roads: how wide they can read as, and how often people can cross them. */

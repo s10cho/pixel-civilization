@@ -2,14 +2,15 @@ import * as THREE from 'three';
 import type { Building } from '../building/types';
 import { SIGNAL_LIGHTS } from '../config/gameConfig';
 import { roadLaneWith } from '../world/roads';
-import { signalAt } from '../world/signals';
+import { carsMayPass, crossingSignalAt, signalAt } from '../world/signals';
 import { tileToWorld } from './coords';
 import { box, cylinder, merge, part } from './modelParts';
 
 interface Light {
   col: number;
   row: number;
-  /** The direction this lamp speaks for. */
+  /** A junction lamp speaks for one direction of traffic; a crossing lamp speaks for people. */
+  kind: 'junction' | 'crossing';
   axis: 'x' | 'z';
   x: number;
   z: number;
@@ -33,7 +34,7 @@ export class TrafficLightsView {
 
   constructor(
     private readonly scene: THREE.Scene,
-    capacity = 80,
+    capacity = 260,
   ) {
     const pole = merge([
       part(cylinder(0.018, 0.022, SIGNAL_LIGHTS.poleHeight, 6), 'iron', { y: SIGNAL_LIGHTS.poleHeight / 2 }),
@@ -51,7 +52,7 @@ export class TrafficLightsView {
     scene.add(this.lamps);
   }
 
-  /** Puts a pair of lights on every junction. */
+  /** Puts a pair of lights on every junction, and a pedestrian light beside every crossing. */
   sync(buildings: readonly Building[]): void {
     const roads = new Set<number>();
     for (const building of buildings) {
@@ -63,11 +64,27 @@ export class TrafficLightsView {
     for (const tile of roads) {
       const col = Math.floor(tile / 1000);
       const row = tile % 1000;
-      if (roadLaneWith(isRoadAt, col, row).axis !== 'junction') continue;
+      const lane = roadLaneWith(isRoadAt, col, row);
       if (this.lights.length + 2 > this.poles.instanceMatrix.count) break;
-      // One lamp faces the east-west traffic, the other the north-south.
-      this.lights.push({ col, row, axis: 'x', x: -SIGNAL_LIGHTS.cornerOffset, z: -SIGNAL_LIGHTS.cornerOffset });
-      this.lights.push({ col, row, axis: 'z', x: SIGNAL_LIGHTS.cornerOffset, z: SIGNAL_LIGHTS.cornerOffset });
+      if (lane.axis === 'junction') {
+        // One lamp faces the east-west traffic, the other the north-south.
+        this.lights.push({ col, row, kind: 'junction', axis: 'x', x: -SIGNAL_LIGHTS.cornerOffset, z: -SIGNAL_LIGHTS.cornerOffset });
+        this.lights.push({ col, row, kind: 'junction', axis: 'z', x: SIGNAL_LIGHTS.cornerOffset, z: SIGNAL_LIGHTS.cornerOffset });
+        continue;
+      }
+      // A zebra crossing gets a pedestrian light on each kerb, so both sides can read it.
+      // On a wide road only the outermost tiles carry one, or the poles would stand in traffic.
+      if (!lane.crossing) continue;
+      const axis = lane.axis;
+      const alongX = axis === 'x';
+      const edge = SIGNAL_LIGHTS.kerbOffset;
+      const along = -SIGNAL_LIGHTS.cornerOffset;
+      if (lane.index === 0) {
+        this.lights.push({ col, row, kind: 'crossing', axis, x: alongX ? along : -edge, z: alongX ? -edge : along });
+      }
+      if (lane.index === lane.width - 1) {
+        this.lights.push({ col, row, kind: 'crossing', axis, x: alongX ? along : edge, z: alongX ? edge : along });
+      }
     }
 
     this.lights.forEach((light, index) => {
@@ -94,8 +111,10 @@ export class TrafficLightsView {
   /** Lights the lamps for the current phase. */
   animate(timeOfDay: number): void {
     this.lights.forEach((light, index) => {
-      const signal = signalAt(timeOfDay, light.col, light.row);
-      const go = light.axis === 'x' ? signal === 'eastWest' : signal === 'northSouth';
+      const go =
+        light.kind === 'crossing'
+          ? crossingSignalAt(timeOfDay, light.col, light.row, light.axis) === 'walk'
+          : carsMayPass(signalAt(timeOfDay, light.col, light.row), light.axis);
       this.lamps.setColorAt(index, this.colour.copy(go ? this.green : this.red));
     });
     if (this.lamps.instanceColor) this.lamps.instanceColor.needsUpdate = true;

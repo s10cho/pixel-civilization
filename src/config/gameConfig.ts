@@ -204,6 +204,8 @@ export const SIGNAL_LIGHTS = {
   poleHeight: 0.36,
   /** How far from the tile centre the poles stand. */
   cornerOffset: 0.36,
+  /** How far out a pedestrian light at a crossing stands, so it sits on the kerb. */
+  kerbOffset: 0.44,
   green: 0x4ad66d,
   red: 0xe5484d,
 } as const;

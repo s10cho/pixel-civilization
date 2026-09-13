@@ -3,7 +3,7 @@ import type { Building } from '../building/types';
 import { isCitizenOutside } from '../citizen/behavior';
 import type { Citizen } from '../citizen/types';
 import { TRAFFIC } from '../config/gameConfig';
-import { carsMayPass, signalAt } from '../world/signals';
+import { carsMayPass, crossingSignalAt, signalAt } from '../world/signals';
 import { roadLaneWith } from '../world/roads';
 import { tileToWorld } from './coords';
 import { box, merge, part } from './modelParts';
@@ -182,14 +182,17 @@ export class TrafficView {
     this.material.dispose();
   }
 
-  /** Red lights stop traffic at junctions; at a zebra crossing, people come first. */
+  /** Red lights stop traffic at junctions and crossings, and anyone still on the road comes first. */
   private mayEnter(vehicle: Vehicle, timeOfDay: number, pedestrians: Set<number>): boolean {
     if (vehicle.rail) return true;
     const tile = key(vehicle.nextCol, vehicle.nextRow);
     const control = this.controls.get(tile);
     if (!control) return true;
-    if (control === 'crossing') return !pedestrians.has(tile);
+    if (pedestrians.has(tile)) return false;
     const axis = vehicle.nextCol === vehicle.col ? 'z' : 'x';
+    if (control === 'crossing') {
+      return crossingSignalAt(timeOfDay, vehicle.nextCol, vehicle.nextRow, axis) === 'cars';
+    }
     return carsMayPass(signalAt(timeOfDay, vehicle.nextCol, vehicle.nextRow), axis);
   }
 

@@ -87,8 +87,8 @@ function roadParts(variant: number): THREE.BufferGeometry[] {
   };
 
   if (lane.crossing) {
-    // Zebra stripes: the place to cross on foot.
-    for (const offset of [-0.32, -0.16, 0, 0.16, 0.32]) mark('roadLine', 0.1, 0.76, offset, 0);
+    // Zebra stripes: bars laid along the traffic, repeating across the road.
+    for (const offset of [-0.32, -0.16, 0, 0.16, 0.32]) mark('roadLine', 0.76, 0.1, 0, offset);
     return parts;
   }
 
