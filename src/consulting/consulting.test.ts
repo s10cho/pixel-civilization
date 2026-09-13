@@ -73,4 +73,20 @@ describe('consulting proposals', () => {
     const proposals = getProposals(state, computeCityReport(state));
     expect(proposals.some((proposal) => proposal.kind === 'expand')).toBe(true);
   });
+
+  it('offers more than one kind of plan, so there is a real choice', () => {
+    const state = city();
+    const kinds = new Set(getProposals(state, computeCityReport(state)).map((proposal) => proposal.kind));
+    expect(kinds.size).toBeGreaterThan(1);
+  });
+
+  it('proposes what the era can build, not what it has outgrown', () => {
+    const state = city();
+    state.era = 'modern';
+    state.cityLevel = 12;
+    state.resources.gold = 500_000;
+    const types = new Set(getProposals(state, computeCityReport(state)).flatMap((p) => p.steps.map((s) => s.type)));
+    expect(types.has('house')).toBe(false);
+    expect(types.has('ecoHousing')).toBe(true);
+  });
 });

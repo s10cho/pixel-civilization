@@ -1617,11 +1617,12 @@ export const CONSULTING = {
   roomRunningOutTiles: 8,
   /** Gold sitting unused that is worth mentioning. */
   idleGold: 2000,
-  /** Candidate places offered per kind of plan. */
+  /** Candidate places looked at per kind of plan, and how many of them are offered. */
   candidateSpots: 3,
+  candidatesPerKind: 2,
   /** Minimum distance between two candidates, in tiles. */
   spotSpacing: 4,
-  maxProposals: 4,
+  maxProposals: 6,
 } as const;
 
 /** Thank-you gold for reaching an achievement. Small enough to stay a nice surprise. */

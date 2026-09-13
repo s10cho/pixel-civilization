@@ -20,7 +20,9 @@ export interface PlanStep {
   row: number;
 }
 
-export type ProposalKind = 'housing' | 'industry' | 'green' | 'commerce' | 'expand';
+export type ProposalKind = 'housing' | 'industry' | 'green' | 'commerce' | 'civic' | 'culture' | 'transit' | 'expand';
+
+export type PlanKind = Exclude<ProposalKind, 'expand'>;
 
 /**
  * A plan the player can accept with one tap. Proposals are always optional and always
@@ -45,48 +47,85 @@ export interface Proposal {
 
 export type Where = 'north' | 'east' | 'south' | 'west' | 'centre';
 
-/** A block of buildings the plan repeats on the chosen spot. */
-const TEMPLATES: Record<Exclude<ProposalKind, 'expand'>, { type: BuildingType; dc: number; dr: number }[]> = {
+/**
+ * What each slot of a plan wants, best first: the consulting service offers the best thing the
+ * city can build today, so a modern district is not handed a mud hut.
+ */
+const ROLES = {
+  home: ['ecoHousing', 'highRise', 'townhouseRow', 'studioBlock', 'tenement', 'house'],
+  shop: ['supermarket', 'generalStore', 'marketSquare', 'tradingPost', 'shop'],
+  green: ['playground', 'promenade', 'park'],
+  leisure: ['cinema', 'swimmingPool', 'bathhouse', 'campfire'],
+  works: ['recyclingCenter', 'textileMill', 'sawmill', 'stonemason', 'workshop'],
+  power: ['windFarm', 'gasWorks', 'coalPlant', 'powerPlant'],
+  health: ['hospital', 'clinic', 'infirmary', 'herbalist'],
+  water: ['sewageWorks', 'cistern', 'well'],
+  culture: ['publicLibrary', 'museum', 'musicHall', 'newspaper', 'playhouse', 'storyGround'],
+  transit: ['busTerminal', 'tramStop', 'trainStation', 'stable'],
+  street: ['road'],
+} as const satisfies Record<string, readonly BuildingType[]>;
+
+type Role = keyof typeof ROLES;
+
+/** A block the plan lays on the chosen spot, as roles rather than fixed buildings. */
+const TEMPLATES: Record<PlanKind, { role: Role; dc: number; dr: number }[]> = {
   housing: [
-    { type: 'house', dc: 0, dr: 0 },
-    { type: 'house', dc: 1, dr: 0 },
-    { type: 'house', dc: 0, dr: 1 },
-    { type: 'park', dc: 1, dr: 1 },
-  ],
-  industry: [
-    { type: 'workshop', dc: 0, dr: 0 },
-    { type: 'workshop', dc: 1, dr: 0 },
-    { type: 'powerPlant', dc: 0, dr: 1 },
-  ],
-  green: [
-    { type: 'park', dc: 0, dr: 0 },
-    { type: 'well', dc: 1, dr: 0 },
-    { type: 'park', dc: 1, dr: 1 },
+    { role: 'home', dc: 0, dr: 0 },
+    { role: 'home', dc: 1, dr: 0 },
+    { role: 'home', dc: 0, dr: 1 },
+    { role: 'green', dc: 1, dr: 1 },
   ],
   commerce: [
-    { type: 'shop', dc: 0, dr: 0 },
-    { type: 'shop', dc: 1, dr: 0 },
-    { type: 'road', dc: 0, dr: 1 },
-    { type: 'road', dc: 1, dr: 1 },
+    { role: 'shop', dc: 0, dr: 0 },
+    { role: 'shop', dc: 1, dr: 0 },
+    { role: 'street', dc: 0, dr: 1 },
+    { role: 'street', dc: 1, dr: 1 },
+  ],
+  industry: [
+    { role: 'works', dc: 0, dr: 0 },
+    { role: 'works', dc: 1, dr: 0 },
+    { role: 'power', dc: 0, dr: 1 },
+  ],
+  green: [
+    { role: 'green', dc: 0, dr: 0 },
+    { role: 'green', dc: 1, dr: 1 },
+    { role: 'leisure', dc: 1, dr: 0 },
+  ],
+  civic: [
+    { role: 'health', dc: 0, dr: 0 },
+    { role: 'water', dc: 1, dr: 0 },
+    { role: 'green', dc: 0, dr: 1 },
+  ],
+  culture: [
+    { role: 'culture', dc: 0, dr: 0 },
+    { role: 'culture', dc: 1, dr: 1 },
+    { role: 'green', dc: 1, dr: 0 },
+  ],
+  transit: [
+    { role: 'transit', dc: 0, dr: 0 },
+    { role: 'street', dc: 1, dr: 0 },
+    { role: 'street', dc: 1, dr: 1 },
   ],
 };
 
 /**
- * What the city could do next: up to three places for whatever it needs most, plus widening
- * the territory when it is running out of room.
+ * What the city could do next: a few places for whatever it needs most, several kinds of plan
+ * so there is a real choice, plus widening the territory when it is running out of room.
  */
 export function getProposals(state: GameState, report: CityReport): Proposal[] {
   const proposals: Proposal[] = [];
-  const kinds = neededKinds(state, report);
 
-  for (const kind of kinds) {
+  for (const kind of neededKinds(state, report)) {
     const steps = usableTemplate(state, kind);
     if (steps.length === 0) continue;
+    // The city's most pressing need gets two places to choose between; the rest get one each,
+    // so the list stays a spread of ideas rather than one idea over and over.
+    const wanted = proposals.length === 0 ? CONSULTING.candidatesPerKind : 1;
     let candidate = 0;
     for (const spot of findSpots(state, kind, CONSULTING.candidateSpots)) {
-      candidate++;
       const plan = steps.map((step) => ({ type: step.type, col: spot.col + step.dc, row: spot.row + step.dr }));
       if (plan.some((step) => !isFree(state, step.col, step.row))) continue;
+      candidate++;
       const cost = plan.reduce((total, step) => total + getBuildCost(step.type, state.era), 0);
       proposals.push({
         id: `${kind}:${spot.col}:${spot.row}`,
@@ -97,8 +136,9 @@ export function getProposals(state: GameState, report: CityReport): Proposal[] {
         cost,
         steps: plan,
       });
+      if (candidate >= wanted) break;
     }
-    if (proposals.length >= CONSULTING.candidateSpots) break;
+    if (proposals.length >= CONSULTING.maxProposals) break;
   }
 
   // Running out of room is a decision for the player: offer every side that still has space.
@@ -123,9 +163,9 @@ export function getProposals(state: GameState, report: CityReport): Proposal[] {
   return proposals.slice(0, CONSULTING.maxProposals);
 }
 
-/** Which kinds of plan would help, most useful first. */
-function neededKinds(state: GameState, report: CityReport): Exclude<ProposalKind, 'expand'>[] {
-  const kinds: Exclude<ProposalKind, 'expand'>[] = [];
+/** All the plans that make sense, the ones the city actually needs first. */
+function neededKinds(state: GameState, report: CityReport): PlanKind[] {
+  const kinds: PlanKind[] = [];
   const people = Math.floor(state.resources.population);
   if (report.populationCapacity === 0 || state.resources.population >= report.populationCapacity * CONSULTING.housingFullShare) {
     kinds.push('housing');
@@ -133,16 +173,27 @@ function neededKinds(state: GameState, report: CityReport): Exclude<ProposalKind
   if (people > 0 && report.jobs < people * CONSULTING.jobsPerCitizen) kinds.push('commerce');
   if (state.resources.happiness < CONSULTING.happinessBelow) kinds.push('green');
   if (report.powerDemand > report.powerSupply) kinds.push('industry');
-  // Something is always on offer, even when the city is comfortable.
-  for (const fallback of ['housing', 'commerce', 'green'] as const) {
-    if (!kinds.includes(fallback)) kinds.push(fallback);
+  if (report.pollution.size > 0) kinds.push('civic');
+  // A comfortable city still gets a choice: everything else follows, in a steady order.
+  for (const rest of ['housing', 'commerce', 'green', 'culture', 'civic', 'transit', 'industry'] as const) {
+    if (!kinds.includes(rest)) kinds.push(rest);
   }
   return kinds;
 }
 
-/** The template with anything the city cannot build yet dropped. */
-function usableTemplate(state: GameState, kind: Exclude<ProposalKind, 'expand'>) {
-  return TEMPLATES[kind].filter((step) => getUnlockState(step.type, state) === 'available');
+/** The best building the city can put in this slot today, or nothing if it can build none. */
+function fillRole(state: GameState, role: Role): BuildingType | null {
+  return ROLES[role].find((type) => getUnlockState(type, state) === 'available') ?? null;
+}
+
+/** The template with every slot filled in, dropping anything the city cannot build yet. */
+function usableTemplate(state: GameState, kind: PlanKind): { type: BuildingType; dc: number; dr: number }[] {
+  const steps: { type: BuildingType; dc: number; dr: number }[] = [];
+  for (const step of TEMPLATES[kind]) {
+    const type = fillRole(state, step.role);
+    if (type) steps.push({ type, dc: step.dc, dr: step.dr });
+  }
+  return steps;
 }
 
 /**
@@ -169,10 +220,19 @@ function findSpots(state: GameState, kind: ProposalKind, wanted: number): { col:
 
   spots.sort((a, b) => b.score - a.score);
   const chosen: { col: number; row: number }[] = [];
-  for (const spot of spots) {
-    if (chosen.every((taken) => Math.hypot(taken.col - spot.col, taken.row - spot.row) >= CONSULTING.spotSpacing)) {
-      chosen.push({ col: spot.col, row: spot.row });
+  const taken = new Set<Where>();
+  // Two passes: first one spot per part of the city, then fill up from what is left. Candidates
+  // for the same idea then read as different places rather than three times "the centre".
+  for (const freshRegion of [true, false]) {
+    for (const spot of spots) {
       if (chosen.length >= wanted) break;
+      const where = whereIn(state, spot.col, spot.row);
+      if (freshRegion && taken.has(where)) continue;
+      if (chosen.some((other) => Math.hypot(other.col - spot.col, other.row - spot.row) < CONSULTING.spotSpacing)) {
+        continue;
+      }
+      chosen.push({ col: spot.col, row: spot.row });
+      taken.add(where);
     }
   }
   return chosen;
