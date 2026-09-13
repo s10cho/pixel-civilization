@@ -2,20 +2,29 @@
 /**
  * The consulting relay, as a development server.
  *
- * The game's client never holds an API key: it POSTs `{ brief }` here and gets
+ * The game's client never holds a credential: it POSTs `{ brief }` here and gets
  * `{ note, picks }` back. The released game will point VITE_CONSULTING_URL at a deployed
- * version of exactly this, so the key, the prompt and any rate limiting live on the server.
+ * version of exactly this, so the credential, the prompt and any rate limiting live here.
  *
- *   ANTHROPIC_API_KEY=sk-ant-... node tools/consulting-relay.mjs
- *   CONSULTING_STUB=1 node tools/consulting-relay.mjs      # canned answer, no key, no cost
- *   CONSULTING_DELAY_MS=1500 ...                           # answer slowly, to see the wait
+ * Set one of these in the environment — never on the command line, where it would land in the
+ * shell history — and the matching model answers:
+ *
+ *   GEMINI_API_KEY      -> Google Gemini   (CONSULTING_MODEL default gemini-2.5-flash)
+ *   ANTHROPIC_API_KEY   -> Anthropic       (CONSULTING_MODEL default claude-sonnet-5)
+ *
+ *   node tools/consulting-relay.mjs                    # canned answers when neither is set
+ *   CONSULTING_STUB=1 node tools/consulting-relay.mjs  # canned answers even when one is
+ *   CONSULTING_DELAY_MS=1500 ...                       # answer slowly, to see the card wait
  */
 import { createServer } from 'node:http';
 
 const PORT = Number(process.env.PORT) || 8787;
-const MODEL = process.env.CONSULTING_MODEL || 'claude-sonnet-5';
-const KEY = process.env.ANTHROPIC_API_KEY || '';
-const STUB = process.env.CONSULTING_STUB === '1' || !KEY;
+/** Whichever provider the environment has something for; Gemini wins if both are set. */
+const PROVIDER = process.env.GEMINI_API_KEY ? 'gemini' : process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'none';
+const CREDENTIAL = PROVIDER === 'gemini' ? process.env.GEMINI_API_KEY : (process.env.ANTHROPIC_API_KEY ?? '');
+const DEFAULT_MODEL = { gemini: 'gemini-2.5-flash', anthropic: 'claude-sonnet-5', none: '' };
+const MODEL = process.env.CONSULTING_MODEL || DEFAULT_MODEL[PROVIDER];
+const STUB = process.env.CONSULTING_STUB === '1' || PROVIDER === 'none';
 /** Answer this slowly, to see the card's waiting state. */
 const DELAY_MS = Number(process.env.CONSULTING_DELAY_MS) || 0;
 
@@ -57,15 +66,17 @@ function stubReply(brief) {
   return { note, picks };
 }
 
+const cityPrompt = (brief) => `City summary:\n${JSON.stringify(brief, null, 1)}`;
+
 async function askAnthropic(brief) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
+    headers: { 'content-type': 'application/json', 'x-api-key': CREDENTIAL, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 600,
       system: SYSTEM,
-      messages: [{ role: 'user', content: `City summary:\n${JSON.stringify(brief, null, 1)}` }],
+      messages: [{ role: 'user', content: cityPrompt(brief) }],
     }),
   });
   if (!response.ok) throw new Error(`anthropic ${response.status}: ${await response.text()}`);
@@ -73,6 +84,34 @@ async function askAnthropic(brief) {
   const text = (payload.content ?? []).map((part) => part.text ?? '').join('\n');
   return { text };
 }
+
+/** Overridable so a proxy — or a stand-in during testing — can take its place. */
+const GEMINI_BASE = process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
+
+async function askGemini(brief) {
+  const url = `${GEMINI_BASE}/models/${encodeURIComponent(MODEL)}:generateContent`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': CREDENTIAL },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ role: 'user', parts: [{ text: cityPrompt(brief) }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        maxOutputTokens: 800,
+        // Thinking tokens come out of the same budget as the answer, and a few sentences about
+        // a small city needs none.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    }),
+  });
+  if (!response.ok) throw new Error(`gemini ${response.status}: ${await response.text()}`);
+  const payload = await response.json();
+  const parts = payload.candidates?.[0]?.content?.parts ?? [];
+  return { text: parts.map((part) => part.text ?? '').join('\n') };
+}
+
+const ask = { gemini: askGemini, anthropic: askAnthropic };
 
 const server = createServer((request, response) => {
   response.setHeader('access-control-allow-origin', '*');
@@ -89,7 +128,7 @@ const server = createServer((request, response) => {
     try {
       const { brief } = JSON.parse(body || '{}');
       if (DELAY_MS > 0) await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-      const answer = STUB ? stubReply(brief) : await askAnthropic(brief);
+      const answer = STUB ? stubReply(brief) : await ask[PROVIDER](brief);
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(answer));
       console.log(`[relay] ${STUB ? 'stub' : MODEL} -> ${brief?.options?.length ?? 0} options`);
     } catch (error) {
@@ -100,5 +139,6 @@ const server = createServer((request, response) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[relay] listening on http://localhost:${PORT}  (${STUB ? 'stub answers — set ANTHROPIC_API_KEY for a real model' : MODEL})`);
+  const behind = STUB ? 'stub answers — set GEMINI_API_KEY or ANTHROPIC_API_KEY for a real model' : `${PROVIDER} · ${MODEL}`;
+  console.log(`[relay] listening on http://localhost:${PORT}  (${behind})`);
 });

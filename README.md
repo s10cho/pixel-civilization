@@ -98,24 +98,30 @@ of those plans it would look at first. It cannot invent a plan, a building or a 
 it returns that the game did not offer is dropped before the card sees it. The advisor helps;
 it never plays.
 
-There are two ways to reach a model, chosen by what is configured:
+Either Google Gemini (`gemini-2.5-flash` by default) or Anthropic (`claude-sonnet-5`) can answer,
+and there are two ways to reach one.
+
+**In development**, straight from the browser. Copy `.env.example` to `.env.local` and fill in
+one line — `VITE_GEMINI_API_KEY=` or `VITE_ANTHROPIC_API_KEY=`. `.env.local` is git-ignored and
+only `vite dev` ever reads it; then `npm run dev`.
+
+**In a released build**, through a relay that holds the credential server-side. The client posts
+`{ brief }` and gets `{ note, picks }` back, so which model answers is the server's business:
 
 ```sh
-cp .env.example .env.local
-
-# Development, with your own key. Only `vite dev` ever sees it.
-#   VITE_ANTHROPIC_API_KEY=sk-ant-...
-
-# The shape the released game will use: a small server holds the key.
-#   VITE_CONSULTING_URL=http://localhost:8787/consulting
-npm run relay                                  # canned answers, no key, no cost
-ANTHROPIC_API_KEY=sk-ant-... npm run relay     # a real model
-CONSULTING_DELAY_MS=1500 npm run relay         # answer slowly, to see the card wait
+npm run relay                      # canned answers, nothing configured, no cost
+CONSULTING_DELAY_MS=1500 npm run relay   # answer slowly, to see the card wait
 ```
 
+Export `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` in the shell first and the relay uses that model
+instead (export it rather than putting it on the command line, where it lands in shell history).
+Point the game at it with `VITE_CONSULTING_URL=http://localhost:8787/consulting`.
+
 `tools/consulting-relay.mjs` is that server, small enough to read in one sitting and meant to be
-deployed as-is later. Keys never belong in a build: `vite.config.ts` hands the development key
-only to `vite dev`, and `npm run build` fails if anything key-shaped reaches `dist/`.
+deployed as-is later. Credentials never belong in a build: `vite.config.ts` hands the development
+one to `vite dev` alone, `src/consulting/llm/config.ts` names each variable individually rather
+than reading `import.meta.env` whole, and `npm run build` fails if anything key-shaped reaches
+`dist/`.
 
 ## Structure
 

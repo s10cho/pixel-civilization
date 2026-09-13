@@ -14,6 +14,7 @@ const DIST = 'dist/assets';
 const FORBIDDEN = [
   { name: 'Anthropic API key', pattern: /sk-ant-[A-Za-z0-9_-]{8,}/ },
   { name: 'OpenAI API key', pattern: /sk-proj-[A-Za-z0-9_-]{8,}/ },
+  { name: 'Google API key', pattern: /AIza[A-Za-z0-9_-]{20,}/ },
   { name: 'bearer token', pattern: /Bearer\s+[A-Za-z0-9._-]{20,}/ },
 ];
 

@@ -1,9 +1,9 @@
 import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ command, mode }) => {
-  // The development API key is handed to the browser by `vite dev` and by nothing else. Vite
+  // Development credentials are handed to the browser by `vite dev` and by nothing else. Vite
   // inlines every VITE_* variable it can see, dead branches included, so a build must never be
-  // allowed to see this one: a key left in .env.local would otherwise end up in the bundle.
+  // allowed to see these: one left in .env.local would otherwise end up in the bundle.
   const devEnv = command === 'serve' ? loadEnv(mode, new URL('.', import.meta.url).pathname, 'VITE_') : {};
 
   return {
@@ -11,6 +11,7 @@ export default defineConfig(({ command, mode }) => {
     base: './',
     define: {
       __DEV_ANTHROPIC_KEY__: JSON.stringify(devEnv.VITE_ANTHROPIC_API_KEY ?? ''),
+      __DEV_GEMINI_KEY__: JSON.stringify(devEnv.VITE_GEMINI_API_KEY ?? ''),
     },
     server: {
       port: 5173,

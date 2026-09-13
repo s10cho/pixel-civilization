@@ -1,5 +1,6 @@
-import { consultingConfig, directApiKey, type ConsultingConfig } from './config';
+import { consultingConfig, devCredential, type ConsultingConfig } from './config';
 import { SYSTEM_PROMPT, parseReply, userPrompt } from './prompt';
+import { replyText } from './replies';
 import type { CityBrief, ConsultingReply } from './types';
 
 /** Whether a model is reachable at all. When it is not, the local advisor is the whole service. */
@@ -12,9 +13,9 @@ export function consultingMode(): ConsultingConfig['mode'] {
 }
 
 /**
- * Asks the model to read the city. Returns null on any trouble at all — no key, no network,
- * a slow answer, a reply that does not parse — and the caller simply shows the local advice.
- * The consulting card must never depend on this succeeding.
+ * Asks the model to read the city. Returns null on any trouble at all — nothing configured, no
+ * network, a slow answer, a reply that does not parse — and the caller simply shows the local
+ * advice. The consulting card must never depend on this succeeding.
  */
 export async function askModel(brief: CityBrief): Promise<ConsultingReply | null> {
   const config = consultingConfig();
@@ -40,41 +41,49 @@ export async function askModel(brief: CityBrief): Promise<ConsultingReply | null
   }
 }
 
+/**
+ * A relay needs nothing but the content type: it holds the credential itself. Direct mode
+ * carries the development credential, which only `vite dev` ever fills in.
+ */
 function headersFor(config: ConsultingConfig): Record<string, string> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (config.mode === 'direct') {
-    headers['x-api-key'] = directApiKey();
-    headers['anthropic-version'] = '2023-06-01';
-    // Only ever set in `npm run dev`; a built bundle cannot reach this branch.
-    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  if (config.mode !== 'direct') return headers;
+
+  if (config.provider === 'gemini') {
+    headers['x-goog-api-key'] = devCredential('gemini');
+    return headers;
   }
+  headers['x-api-key'] = devCredential('anthropic');
+  headers['anthropic-version'] = '2023-06-01';
+  headers['anthropic-dangerous-direct-browser-access'] = 'true';
   return headers;
 }
 
 /**
- * The relay speaks the game's own small shape, so the key and the prompt can live on the
- * server later without the client changing. Direct mode speaks the Messages API.
+ * The relay speaks the game's own small shape, so the credential and the prompt can live on the
+ * server later without the client changing. Direct mode speaks whichever provider's own shape.
  */
 function bodyFor(config: ConsultingConfig, brief: CityBrief): unknown {
   if (config.mode === 'relay') return { brief };
+
+  if (config.provider === 'gemini') {
+    return {
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ text: userPrompt(brief) }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        maxOutputTokens: 800,
+        // A few sentences about a small city needs no deliberation, and thinking tokens come
+        // out of the same budget as the answer.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    };
+  }
+
   return {
     model: config.model,
     max_tokens: 600,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt(brief) }],
   };
-}
-
-/** Pulls the text out of either shape of answer. */
-function replyText(payload: unknown): string | null {
-  if (typeof payload !== 'object' || payload === null) return null;
-  const body = payload as { content?: unknown; note?: unknown; picks?: unknown; text?: unknown };
-  // A relay may simply answer with the finished object.
-  if (typeof body.note === 'string' || Array.isArray(body.picks)) return JSON.stringify(body);
-  if (typeof body.text === 'string') return body.text;
-  if (!Array.isArray(body.content)) return null;
-  const parts = body.content
-    .map((part) => (typeof part === 'object' && part !== null ? (part as { text?: unknown }).text : null))
-    .filter((text): text is string => typeof text === 'string');
-  return parts.length > 0 ? parts.join('\n') : null;
 }
